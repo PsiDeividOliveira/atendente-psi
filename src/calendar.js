@@ -24,6 +24,25 @@ async function getToken() {
 
 const calId = () => encodeURIComponent(config.google.calendarId || 'primary');
 
+// Cores de evento do Google Calendar (colorId oficial). Aceita nomes em PT.
+const CORES = {
+  vermelho: '11', tomate: '11',
+  laranja: '6', tangerina: '6',
+  amarelo: '5', banana: '5',
+  verde: '10', 'verde-escuro': '10', manjericao: '10',
+  'verde-claro': '2', sage: '2',
+  azul: '9', 'azul-escuro': '9', 'azul-marinho': '9',
+  'azul-claro': '7', pavao: '7', ciano: '7', turquesa: '7',
+  roxo: '3', uva: '3',
+  lavanda: '1', 'roxo-claro': '1',
+  rosa: '4', salmao: '4', flamingo: '4',
+  cinza: '8', grafite: '8',
+};
+function corId(cor) {
+  if (!cor) return undefined;
+  return CORES[String(cor).toLowerCase().trim()];
+}
+
 async function calFetch(path, method = 'GET', body) {
   const token = await getToken();
   const res = await fetch(`https://www.googleapis.com/calendar/v3/${path}`, {
@@ -39,7 +58,7 @@ async function calFetch(path, method = 'GET', body) {
 }
 
 // Cria um COMPROMISSO com hora. inicio/fim = 'YYYY-MM-DDTHH:MM:SS' (horário de Brasília).
-export async function criarEvento({ titulo, inicio, fim, descricao }) {
+export async function criarEvento({ titulo, inicio, fim, descricao, cor }) {
   const tz = config.google.timezone;
   const body = {
     summary: titulo,
@@ -47,12 +66,14 @@ export async function criarEvento({ titulo, inicio, fim, descricao }) {
     start: { dateTime: inicio, timeZone: tz },
     end: { dateTime: fim || inicio, timeZone: tz },
   };
+  const cid = corId(cor);
+  if (cid) body.colorId = cid;
   const ev = await calFetch(`calendars/${calId()}/events`, 'POST', body);
   return { id: ev.id, link: ev.htmlLink };
 }
 
 // Cria uma TAREFA como evento de dia inteiro. quando = 'YYYY-MM-DD' (ou vazio = hoje).
-export async function criarTarefa({ titulo, quando, descricao }) {
+export async function criarTarefa({ titulo, quando, descricao, cor }) {
   const dia = quando && /^\d{4}-\d{2}-\d{2}$/.test(quando) ? quando : hojeISO();
   const body = {
     summary: `✅ ${titulo}`,
@@ -60,6 +81,8 @@ export async function criarTarefa({ titulo, quando, descricao }) {
     start: { date: dia },
     end: { date: diaSeguinte(dia) }, // fim exclusivo no Google
   };
+  const cid = corId(cor);
+  if (cid) body.colorId = cid;
   const ev = await calFetch(`calendars/${calId()}/events`, 'POST', body);
   return { id: ev.id, link: ev.htmlLink };
 }
