@@ -34,6 +34,16 @@ function parseEvent(body) {
   return { number, text: String(text).trim(), pushName: data.pushName || '', quotedMsgId };
 }
 
+// Normaliza número BR p/ comparação: o WhatsApp às vezes reporta celulares
+// sem o 9º dígito (55 + DDD + 8) e às vezes com ele (55 + DDD + 9 + 8).
+// Removemos o "9" extra pra as duas formas baterem.
+function normBR(num) {
+  const d = String(num || '').replace(/\D/g, '');
+  if (d.length === 13 && d.startsWith('55') && d[4] === '9') return d.slice(0, 4) + d.slice(5);
+  return d;
+}
+const mesmoNumero = (a, b) => Boolean(a) && Boolean(b) && normBR(a) === normBR(b);
+
 // Notifica o Deivid quando chega lead que precisa de ação dele.
 setLeadNotifier(async (lead) => {
   if (!config.notifyNumber) return;
@@ -56,7 +66,7 @@ app.post('/webhook', async (req, res) => {
     const evt = parseEvent(req.body);
     if (!evt || !evt.text) return;
 
-    const ehAdmin = config.admin.number && evt.number === config.admin.number;
+    const ehAdmin = mesmoNumero(evt.number, config.admin.number);
 
     if (ehAdmin) {
       // 1) É uma resposta CITANDO uma notificação de dúvida? Resolve a escalação.
