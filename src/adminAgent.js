@@ -6,7 +6,9 @@ import { buildAdminPrompt } from './prompt.js';
 import { getHistory, pushMessage } from './memory.js';
 import * as db from './db.js';
 import { resolverPorId } from './escalation.js';
-import { criarEvento, criarTarefa, listarProximos, atualizarEvento, apagarEvento } from './calendar.js';
+import {
+  criarEvento, criarTarefa, listarProximos, atualizarEvento, apagarEvento, concluirEvento, cancelarEvento,
+} from './calendar.js';
 
 const anthropic = new Anthropic({ apiKey: config.claude.apiKey });
 
@@ -97,6 +99,9 @@ const TOOLS = [
         fim: { type: 'string', description: 'Fim: "YYYY-MM-DDTHH:MM:SS". Se não souber, use início + 1h.' },
         descricao: { type: 'string', description: 'Detalhes/observações (opcional)' },
         cor: { type: 'string', description: 'Cor do evento (opcional): vermelho, laranja, amarelo, verde, azul, roxo, rosa, cinza. Use pra categorizar (ex.: consulta=vermelho, palestra=verde).' },
+        recorrencia: { type: 'string', description: 'Repetição (opcional): diaria, semanal, quinzenal, mensal, anual. Só pra eventos que se repetem (ex.: consulta toda quinta).' },
+        repeticoes: { type: 'number', description: 'Quantas vezes repetir (opcional). Ex.: 8 sessões.' },
+        ate: { type: 'string', description: 'Repetir até esta data "YYYY-MM-DD" (opcional, alternativa a repeticoes).' },
       },
       required: ['titulo', 'inicio', 'fim'],
     },
@@ -141,9 +146,29 @@ const TOOLS = [
     },
   },
   {
+    name: 'concluir_evento',
+    description:
+      'Marca um evento/tarefa como CONCLUÍDO (fica verde com ✔️, permanece na agenda). Use listar_agenda pra achar o id.',
+    input_schema: {
+      type: 'object',
+      properties: { id: { type: 'string', description: 'ID do evento (obtido via listar_agenda)' } },
+      required: ['id'],
+    },
+  },
+  {
+    name: 'cancelar_evento',
+    description:
+      'Marca um evento como CANCELADO (fica cinza com ❌, mas PERMANECE na agenda como registro). Diferente de apagar. Use listar_agenda pra achar o id.',
+    input_schema: {
+      type: 'object',
+      properties: { id: { type: 'string', description: 'ID do evento (obtido via listar_agenda)' } },
+      required: ['id'],
+    },
+  },
+  {
     name: 'apagar_compromisso',
     description:
-      'Apaga/cancela um evento da agenda pelo id. Use listar_agenda pra achar o id. SEMPRE confirme com o Deivid antes — é irreversível.',
+      'REMOVE de vez um evento da agenda pelo id (some da agenda). Use listar_agenda pra achar o id. SEMPRE confirme com o Deivid antes — é irreversível. Se ele quer só marcar como cancelado (manter registro), use cancelar_evento.',
     input_schema: {
       type: 'object',
       properties: { id: { type: 'string', description: 'ID do evento (obtido via listar_agenda)' } },
@@ -238,10 +263,26 @@ async function runTool(name, input, autorizado) {
           return `Não consegui editar: ${e.message}`;
         }
       }
+      case 'concluir_evento': {
+        try {
+          await concluirEvento(input);
+          return `OK. Marcado como concluído (✔️ verde).`;
+        } catch (e) {
+          return `Não consegui concluir: ${e.message}`;
+        }
+      }
+      case 'cancelar_evento': {
+        try {
+          await cancelarEvento(input);
+          return `OK. Marcado como cancelado (❌ cinza), mantido na agenda.`;
+        } catch (e) {
+          return `Não consegui cancelar: ${e.message}`;
+        }
+      }
       case 'apagar_compromisso': {
         try {
           await apagarEvento(input);
-          return `OK. Compromisso apagado da agenda.`;
+          return `OK. Compromisso removido da agenda.`;
         } catch (e) {
           return `Não consegui apagar: ${e.message}`;
         }

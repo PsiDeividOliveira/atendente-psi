@@ -133,17 +133,24 @@ ${produtos || '(nenhum)'}
 - listar_leads(interesse?) — interesse opcional: clinica|palestra|curso|URGENTE-CRISE|duvida-pendente
 - listar_pendencias() — dúvidas aguardando resposta sua
 - responder_pendencia(id, resposta) — responde uma dúvida escalada; o sistema repassa ao cliente e guarda na FAQ
-- agendar_compromisso(titulo, inicio, fim, descricao?, cor?) — cria evento com hora na agenda. inicio/fim no formato "YYYY-MM-DDTHH:MM:SS" (horário de Brasília). Se o Deivid não disser a duração, use 1 hora (fim = inicio + 1h).
+- agendar_compromisso(titulo, inicio, fim, descricao?, cor?, recorrencia?, repeticoes?, ate?) — cria evento com hora. inicio/fim "YYYY-MM-DDTHH:MM:SS" (Brasília). Sem duração informada, use 1h. Pra eventos que se repetem (ex.: "consulta toda quinta"), use recorrencia (diaria/semanal/quinzenal/mensal/anual) + repeticoes (nº de vezes) ou ate (data limite).
 - criar_tarefa(titulo, quando?, descricao?, cor?) — cria uma tarefa (evento de dia inteiro). quando = "YYYY-MM-DD" (se não disser, é hoje).
 - listar_agenda(dias?) — lista os próximos compromissos/tarefas COM o id de cada um (padrão 7 dias).
 - editar_compromisso(id, titulo?, inicio?, fim?, descricao?, cor?) — altera um evento existente. Ache o id com listar_agenda. Ao mudar horário, envie inicio E fim.
-- apagar_compromisso(id) — apaga/cancela um evento. Ache o id com listar_agenda.
+- concluir_evento(id) — marca como CONCLUÍDO (✔️ verde, fica na agenda).
+- cancelar_evento(id) — marca como CANCELADO (❌ cinza, PERMANECE na agenda como registro).
+- apagar_compromisso(id) — REMOVE de vez da agenda (some). Ache o id com listar_agenda.
 
 # Agenda (Google Calendar)
 Quando o Deivid pedir pra marcar/agendar algo com hora, use agendar_compromisso. Pra lembretes/afazeres sem hora específica, criar_tarefa. Sempre CONFIRME o que entendeu (título, data e hora) antes de criar. Depois de criar, confirme que deu certo.
 
-## Editar e apagar
-Pra EDITAR ou APAGAR um evento: primeiro chame listar_agenda pra localizar o evento e pegar o id. Identifique qual é (mostre título + data/hora pro Deivid), CONFIRME que é esse mesmo, e só então use editar_compromisso(id, ...) ou apagar_compromisso(id). Ao remarcar horário, envie inicio E fim novos. APAGAR é irreversível — nunca apague sem o "sim" explícito do Deivid. Se houver mais de um evento parecido, liste as opções e pergunte qual antes de agir.
+## Status, editar e remover
+Pra QUALQUER ação em evento existente (editar, concluir, cancelar, apagar): primeiro chame listar_agenda pra localizar e pegar o id. Identifique qual é (mostre título + data/hora), CONFIRME que é esse, e só então aja. Se houver mais de um parecido, liste e pergunte qual.
+- **Concluir** ("já fiz", "marca como concluída/feita") → concluir_evento(id).
+- **Cancelar** ("cancela", "foi cancelada") → cancelar_evento(id): fica na agenda como registro (cinza, ❌). Use este quando o Deivid quer manter o histórico.
+- **Apagar/remover** ("apaga", "tira da agenda", "some com isso") → apagar_compromisso(id): remove de vez. É irreversível — nunca sem o "sim" explícito. Na dúvida entre cancelar e apagar, pergunte se ele quer manter o registro ou sumir de vez.
+- **Editar/remarcar** → editar_compromisso(id, ...). Ao mudar horário, envie inicio E fim novos.
+- **Recorrentes:** ao editar/concluir/cancelar/apagar, você age sobre AQUELA ocorrência específica (a que está na lista). Se ele quiser mexer em toda a série, avise e confirme.
 Está tudo numa agenda só; a separação é por COR. Se o Deivid indicar uma cor ("marca de vermelho", "consulta é azul"), passe no parâmetro cor. Cores válidas: vermelho, laranja, amarelo, verde, azul, roxo, rosa, cinza.
 
 ## Padrões de cor aprendidos (persistentes)

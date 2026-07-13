@@ -43,6 +43,26 @@ function corId(cor) {
   return CORES[String(cor).toLowerCase().trim()];
 }
 
+// Monta a regra de recorrência (RRULE) do Google a partir de termos em PT.
+function buildRRULE({ recorrencia, repeticoes, ate }) {
+  if (!recorrencia) return undefined;
+  const FREQ = {
+    diaria: 'FREQ=DAILY', diario: 'FREQ=DAILY',
+    semanal: 'FREQ=WEEKLY', semanalmente: 'FREQ=WEEKLY',
+    quinzenal: 'FREQ=WEEKLY;INTERVAL=2',
+    mensal: 'FREQ=MONTHLY', mensalmente: 'FREQ=MONTHLY',
+    anual: 'FREQ=YEARLY', anualmente: 'FREQ=YEARLY',
+  };
+  let rule = FREQ[String(recorrencia).toLowerCase().trim()];
+  if (!rule) return undefined;
+  if (repeticoes && Number(repeticoes) > 0) {
+    rule += `;COUNT=${Math.floor(Number(repeticoes))}`;
+  } else if (ate && /^\d{4}-\d{2}-\d{2}$/.test(ate)) {
+    rule += `;UNTIL=${ate.replace(/-/g, '')}T235959Z`;
+  }
+  return [`RRULE:${rule}`];
+}
+
 async function calFetch(path, method = 'GET', body) {
   const token = await getToken();
   const res = await fetch(`https://www.googleapis.com/calendar/v3/${path}`, {
@@ -58,7 +78,7 @@ async function calFetch(path, method = 'GET', body) {
 }
 
 // Cria um COMPROMISSO com hora. inicio/fim = 'YYYY-MM-DDTHH:MM:SS' (horário de Brasília).
-export async function criarEvento({ titulo, inicio, fim, descricao, cor }) {
+export async function criarEvento({ titulo, inicio, fim, descricao, cor, recorrencia, repeticoes, ate }) {
   const tz = config.google.timezone;
   const body = {
     summary: titulo,
@@ -68,6 +88,8 @@ export async function criarEvento({ titulo, inicio, fim, descricao, cor }) {
   };
   const cid = corId(cor);
   if (cid) body.colorId = cid;
+  const rec = buildRRULE({ recorrencia, repeticoes, ate });
+  if (rec) body.recurrence = rec;
   const ev = await calFetch(`calendars/${calId()}/events`, 'POST', body);
   return { id: ev.id, link: ev.htmlLink };
 }
@@ -122,10 +144,37 @@ export async function atualizarEvento({ id, titulo, inicio, fim, descricao, cor 
   return { id: ev.id, link: ev.htmlLink };
 }
 
-// Apaga/cancela um evento pelo id.
+// Apaga (remove de vez) um evento pelo id.
 export async function apagarEvento({ id }) {
   if (!id) throw new Error('id do evento é obrigatório');
   await calFetch(`calendars/${calId()}/events/${encodeURIComponent(id)}`, 'DELETE');
+  return { ok: true };
+}
+
+async function getEvento(id) {
+  return calFetch(`calendars/${calId()}/events/${encodeURIComponent(id)}`);
+}
+
+// Remove marcadores de status antigos do título pra não empilhar (✔️/❌).
+function tituloLimpo(summary) {
+  return (summary || '').replace(/^\s*(✔️|✅|❌\s*CANCELADO\s*—|❌)\s*/u, '').trim();
+}
+
+// Marca um evento como CONCLUÍDO (✔️ no título + verde), mantendo na agenda.
+export async function concluirEvento({ id }) {
+  if (!id) throw new Error('id do evento é obrigatório');
+  const ev = await getEvento(id);
+  const body = { summary: `✔️ ${tituloLimpo(ev.summary)}`, colorId: CORES.verde };
+  await calFetch(`calendars/${calId()}/events/${encodeURIComponent(id)}`, 'PATCH', body);
+  return { ok: true };
+}
+
+// Marca um evento como CANCELADO (❌ no título + cinza), SEM apagar (fica de registro).
+export async function cancelarEvento({ id }) {
+  if (!id) throw new Error('id do evento é obrigatório');
+  const ev = await getEvento(id);
+  const body = { summary: `❌ CANCELADO — ${tituloLimpo(ev.summary)}`, colorId: CORES.cinza };
+  await calFetch(`calendars/${calId()}/events/${encodeURIComponent(id)}`, 'PATCH', body);
   return { ok: true };
 }
 
