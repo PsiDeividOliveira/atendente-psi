@@ -7,7 +7,8 @@ import { initDb } from './db.js';
 import { handleCustomer, setLeadNotifier } from './agent.js';
 import { handleAdmin } from './adminAgent.js';
 import { resolverPorCitacao, varrerTimeouts } from './escalation.js';
-import { sendText, sendTyping } from './evolution.js';
+import { sendText, sendTyping, getMediaBase64 } from './evolution.js';
+import { transcribeAudio } from './transcribe.js';
 
 const app = express();
 app.use(express.json({ limit: '2mb' }));
@@ -31,7 +32,29 @@ function parseEvent(body) {
   const text = msg.conversation || ext?.text || msg.imageMessage?.caption || msg.videoMessage?.caption || '';
   const quotedMsgId = ext?.contextInfo?.stanzaId || null; // id da mensagem que ele respondeu/citou
 
-  return { number, text: String(text).trim(), pushName: data.pushName || '', quotedMsgId };
+  // Áudio (nota de voz = audioMessage, geralmente ptt:true) — vamos transcrever.
+  const audio = msg.audioMessage
+    ? { mimetype: msg.audioMessage.mimetype || 'audio/ogg' }
+    : null;
+
+  return {
+    number,
+    text: String(text).trim(),
+    pushName: data.pushName || '',
+    quotedMsgId,
+    audio,
+    key: data.key || null,
+  };
+}
+
+// Descobre o formato do áudio a partir do mimetype (pra mandar pro transcritor).
+function formatoAudio(mimetype = '') {
+  const m = mimetype.toLowerCase();
+  if (m.includes('ogg')) return 'ogg';
+  if (m.includes('mp4') || m.includes('m4a') || m.includes('aac')) return 'm4a';
+  if (m.includes('wav')) return 'wav';
+  if (m.includes('mpeg') || m.includes('mp3')) return 'mp3';
+  return 'ogg';
 }
 
 // Normaliza número BR p/ comparação: o WhatsApp às vezes reporta celulares
@@ -64,7 +87,28 @@ app.post('/webhook', async (req, res) => {
 
   try {
     const evt = parseEvent(req.body);
-    if (!evt || !evt.text) return;
+    if (!evt) return;
+
+    // Áudio (nota de voz) → transcreve pra texto antes de rotear.
+    if (!evt.text && evt.audio && evt.key) {
+      try {
+        await sendTyping(evt.number, 1500);
+        const { base64, mimetype } = await getMediaBase64(evt.key);
+        if (base64) {
+          evt.text = await transcribeAudio(base64, formatoAudio(mimetype || evt.audio.mimetype));
+          console.log(`[audio] transcrito (${evt.text.length} chars) de ${evt.number}`);
+        }
+      } catch (e) {
+        console.error('[audio] falha na transcrição:', e.message);
+        await sendText(
+          evt.number,
+          'Recebi seu áudio, mas tive um probleminha pra ouvir agora. Pode me mandar por texto que eu te ajudo? 😊',
+        ).catch(() => {});
+        return;
+      }
+    }
+
+    if (!evt.text) return; // sem texto (nem áudio transcrito) → ignora silenciosamente
 
     const ehAdmin = mesmoNumero(evt.number, config.admin.number);
 

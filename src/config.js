@@ -15,6 +15,13 @@ export const config = {
     model: process.env.CLAUDE_MODEL || 'claude-sonnet-5',
   },
 
+  // OpenRouter — usado só pra TRANSCREVER áudio (o "ouvido" do bot).
+  // Modelo multimodal que aceita áudio (Gemini). O cérebro segue sendo o Claude.
+  openrouter: {
+    apiKey: process.env.OPENROUTER_API_KEY || '',
+    model: process.env.OPENROUTER_TRANSCRIBE_MODEL || 'google/gemini-2.5-flash',
+  },
+
   db: {
     url: process.env.DATABASE_URL || '',
   },
