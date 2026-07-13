@@ -80,16 +80,40 @@ async function runTool(name, input, ctx) {
   return `Ferramenta desconhecida: ${name}`;
 }
 
+// Monta o bloco de mídia (imagem/PDF) pro formato do Claude.
+function blocoMidia(attachment) {
+  if (attachment.kind === 'image') {
+    return { type: 'image', source: { type: 'base64', media_type: attachment.media_type, data: attachment.data } };
+  }
+  return { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: attachment.data } };
+}
+
 // Processa uma mensagem do cliente e devolve o texto de resposta.
-export async function handleCustomer(number, userText, pushName = '') {
+// attachment (opcional): { kind:'image'|'document', media_type, data(base64) }
+export async function handleCustomer(number, userText, pushName = '', attachment = null) {
   const base = await loadBase();
   const system = buildSystemPrompt(base);
   const ctx = { number, pushName };
 
-  await pushMessage(number, { role: 'user', content: userText });
+  const historyText = userText || (attachment
+    ? (attachment.kind === 'image' ? '[imagem enviada]' : '[documento PDF enviado]')
+    : '');
+  await pushMessage(number, { role: 'user', content: historyText });
   const messages = (await getHistory(number)).map((m) => ({ role: m.role, content: m.content }));
   // A API exige que a 1ª mensagem seja do usuário — descarta assistant no começo da janela.
   while (messages.length && messages[0].role !== 'user') messages.shift();
+
+  // Anexa a mídia na mensagem atual (só nesta chamada; no histórico fica o texto).
+  if (attachment && messages.length) {
+    const promptText = userText
+      || (attachment.kind === 'image'
+        ? 'O cliente enviou esta imagem. Siga as regras (sem juízo de valor / sem interpretar desenhos).'
+        : 'O cliente enviou este documento. Responda com base no conteúdo.');
+    messages[messages.length - 1] = {
+      role: 'user',
+      content: [{ type: 'text', text: promptText }, blocoMidia(attachment)],
+    };
+  }
 
   let finalText = '';
 

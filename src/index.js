@@ -37,12 +37,19 @@ function parseEvent(body) {
     ? { mimetype: msg.audioMessage.mimetype || 'audio/ogg' }
     : null;
 
+  // Imagem ou documento (PDF) — o Claude vê/lê nativamente.
+  const docMsg = msg.documentMessage || msg.documentWithCaptionMessage?.message?.documentMessage || null;
+  let media = null;
+  if (msg.imageMessage) media = { kind: 'image', mimetype: msg.imageMessage.mimetype || 'image/jpeg' };
+  else if (docMsg) media = { kind: 'document', mimetype: docMsg.mimetype || '' };
+
   return {
     number,
     text: String(text).trim(),
     pushName: data.pushName || '',
     quotedMsgId,
     audio,
+    media,
     key: data.key || null,
   };
 }
@@ -108,25 +115,47 @@ app.post('/webhook', async (req, res) => {
       }
     }
 
-    if (!evt.text) return; // sem texto (nem áudio transcrito) → ignora silenciosamente
+    // Imagem / documento (PDF) → baixa e anexa pro Claude ver/ler.
+    let attachment = null;
+    if (evt.media && evt.key) {
+      try {
+        const { base64, mimetype } = await getMediaBase64(evt.key);
+        const mt = (mimetype || evt.media.mimetype || '').split(';')[0].trim();
+        if (evt.media.kind === 'image' && base64) {
+          attachment = { kind: 'image', media_type: mt || 'image/jpeg', data: base64 };
+        } else if (evt.media.kind === 'document' && /pdf/i.test(mt) && base64) {
+          attachment = { kind: 'document', media_type: 'application/pdf', data: base64 };
+        } else if (evt.media.kind === 'document') {
+          await sendText(
+            evt.number,
+            'Recebi seu documento, mas por enquanto só consigo ler PDF. Pode me mandar em PDF ou me contar o que é? 😊',
+          ).catch(() => {});
+          return;
+        }
+      } catch (e) {
+        console.error('[media] falha ao baixar/anexar:', e.message);
+      }
+    }
+
+    if (!evt.text && !attachment) return; // nada útil → ignora silenciosamente
 
     const ehAdmin = mesmoNumero(evt.number, config.admin.number);
 
     if (ehAdmin) {
       // 1) É uma resposta CITANDO uma notificação de dúvida? Resolve a escalação.
-      if (evt.quotedMsgId) {
+      if (evt.quotedMsgId && evt.text) {
         const resolvido = await resolverPorCitacao(evt.quotedMsgId, evt.text);
         if (resolvido) return;
       }
       // 2) Senão, é comando de administração.
-      const reply = await handleAdmin(evt.number, evt.text);
+      const reply = await handleAdmin(evt.number, evt.text, attachment);
       await sendText(evt.number, reply);
       return;
     }
 
     // Cliente comum
     await sendTyping(evt.number, 1200);
-    const reply = await handleCustomer(evt.number, evt.text, evt.pushName);
+    const reply = await handleCustomer(evt.number, evt.text, evt.pushName, attachment);
     await sendText(evt.number, reply);
   } catch (err) {
     console.error('[webhook] erro:', err);

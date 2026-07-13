@@ -144,11 +144,14 @@ async function runTool(name, input, autorizado) {
   }
 }
 
-export async function handleAdmin(number, userText) {
+export async function handleAdmin(number, userText, attachment = null) {
   const base = await db.loadBase();
   const system = buildAdminPrompt(base);
 
-  await pushMessage(ADMIN_KEY, { role: 'user', content: userText });
+  const historyText = userText || (attachment
+    ? (attachment.kind === 'image' ? '[imagem enviada]' : '[documento PDF enviado]')
+    : '');
+  await pushMessage(ADMIN_KEY, { role: 'user', content: historyText });
   const hist = await getHistory(ADMIN_KEY);
 
   // Palavra-chave: se configurada, precisa ter aparecido no histórico recente
@@ -158,6 +161,16 @@ export async function handleAdmin(number, userText) {
 
   const messages = hist.map((m) => ({ role: m.role, content: m.content }));
   while (messages.length && messages[0].role !== 'user') messages.shift();
+
+  // Anexa mídia (imagem/PDF) na mensagem atual, se houver.
+  if (attachment && messages.length) {
+    const promptText = userText || 'Veja este anexo que enviei.';
+    const bloco = attachment.kind === 'image'
+      ? { type: 'image', source: { type: 'base64', media_type: attachment.media_type, data: attachment.data } }
+      : { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: attachment.data } };
+    messages[messages.length - 1] = { role: 'user', content: [{ type: 'text', text: promptText }, bloco] };
+  }
+
   let finalText = '';
 
   for (let round = 0; round < 5; round++) {
