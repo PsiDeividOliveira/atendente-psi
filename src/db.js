@@ -77,6 +77,14 @@ create table if not exists auditoria (
   autor text,
   criado_em timestamptz default now()
 );
+create table if not exists historico (
+  id serial primary key,
+  contato text not null,
+  role text not null,
+  content text not null,
+  criado_em timestamptz default now()
+);
+create index if not exists idx_historico_contato on historico (contato, id);
 `;
 
 export async function initDb() {
@@ -267,4 +275,22 @@ export async function addAudit(acao, detalhe, autor = 'sistema') {
   } catch (e) {
     console.warn('[db] auditoria falhou:', e.message);
   }
+}
+
+// ── Histórico de conversa (persistente, por contato) ─────────
+export async function appendHistorico(contato, role, content) {
+  await q('insert into historico (contato, role, content) values ($1,$2,$3)', [contato, role, String(content)]);
+}
+
+// Últimas N mensagens do contato, em ordem cronológica.
+export async function getHistorico(contato, limite = 20) {
+  const { rows } = await q(
+    'select role, content from historico where contato = $1 order by id desc limit $2',
+    [contato, limite],
+  );
+  return rows.reverse().map((r) => ({ role: r.role, content: r.content }));
+}
+
+export async function limparHistorico(contato) {
+  await q('delete from historico where contato = $1', [contato]);
 }

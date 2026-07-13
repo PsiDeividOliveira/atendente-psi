@@ -63,7 +63,8 @@ async function runTool(name, input, ctx) {
   }
 
   if (name === 'perguntar_ao_deivid') {
-    const historico = getHistory(ctx.number)
+    const hist = await getHistory(ctx.number);
+    const historico = hist
       .slice(-6)
       .map((m) => `${m.role === 'user' ? 'Cliente' : 'Atendente'}: ${typeof m.content === 'string' ? m.content : '[...]'}`)
       .join('\n');
@@ -85,8 +86,10 @@ export async function handleCustomer(number, userText, pushName = '') {
   const system = buildSystemPrompt(base);
   const ctx = { number, pushName };
 
-  pushMessage(number, { role: 'user', content: userText });
-  const messages = getHistory(number).map((m) => ({ role: m.role, content: m.content }));
+  await pushMessage(number, { role: 'user', content: userText });
+  const messages = (await getHistory(number)).map((m) => ({ role: m.role, content: m.content }));
+  // A API exige que a 1ª mensagem seja do usuário — descarta assistant no começo da janela.
+  while (messages.length && messages[0].role !== 'user') messages.shift();
 
   let finalText = '';
 
@@ -116,6 +119,6 @@ export async function handleCustomer(number, userText, pushName = '') {
 
   if (!finalText) finalText = 'Recebi sua mensagem! Já já te respondo. 😊';
 
-  pushMessage(number, { role: 'assistant', content: finalText });
+  await pushMessage(number, { role: 'assistant', content: finalText });
   return finalText;
 }

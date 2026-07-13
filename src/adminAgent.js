@@ -148,8 +148,8 @@ export async function handleAdmin(number, userText) {
   const base = await db.loadBase();
   const system = buildAdminPrompt(base);
 
-  pushMessage(ADMIN_KEY, { role: 'user', content: userText });
-  const hist = getHistory(ADMIN_KEY);
+  await pushMessage(ADMIN_KEY, { role: 'user', content: userText });
+  const hist = await getHistory(ADMIN_KEY);
 
   // Palavra-chave: se configurada, precisa ter aparecido no histórico recente
   const autorizado =
@@ -157,6 +157,7 @@ export async function handleAdmin(number, userText) {
     hist.some((m) => typeof m.content === 'string' && m.content.includes(config.admin.passphrase));
 
   const messages = hist.map((m) => ({ role: m.role, content: m.content }));
+  while (messages.length && messages[0].role !== 'user') messages.shift();
   let finalText = '';
 
   for (let round = 0; round < 5; round++) {
@@ -183,6 +184,6 @@ export async function handleAdmin(number, userText) {
   }
 
   if (!finalText) finalText = 'Ok.';
-  pushMessage(ADMIN_KEY, { role: 'assistant', content: finalText });
+  await pushMessage(ADMIN_KEY, { role: 'assistant', content: finalText });
   return finalText;
 }

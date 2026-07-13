@@ -42,7 +42,7 @@ async function concluir(pendencia, resposta) {
   // Repassa a resposta pro cliente (com um enquadramento acolhedor)
   const msg = `Consegui confirmar aqui! 😊\n\n${resposta}`;
   await sendText(pendencia.cliente_numero, msg);
-  pushMessage(pendencia.cliente_numero, { role: 'assistant', content: msg });
+  await pushMessage(pendencia.cliente_numero, { role: 'assistant', content: msg });
 
   // Aprende: salva Pergunta+Resposta na FAQ (origem "aprendida"). Auto-save com undo.
   try {
@@ -98,7 +98,7 @@ export async function varrerTimeouts() {
         'Ainda estou confirmando essa informação com o Deivid. ' +
         'Pra não te deixar esperando, ele vai te retornar pessoalmente por aqui, tá? 🙏';
       await sendText(p.cliente_numero, msg);
-      pushMessage(p.cliente_numero, { role: 'assistant', content: msg });
+      await pushMessage(p.cliente_numero, { role: 'assistant', content: msg });
       await appendLead({
         nome: p.cliente_nome || '',
         contato: p.cliente_numero,
