@@ -100,10 +100,33 @@ export async function listarProximos({ dias = 7 } = {}) {
   });
   const data = await calFetch(`calendars/${calId()}/events?${params.toString()}`);
   return (data.items || []).map((e) => ({
+    id: e.id,
     titulo: e.summary || '(sem título)',
     inicio: e.start?.dateTime || e.start?.date || '',
     link: e.htmlLink,
   }));
+}
+
+// Edita um evento existente (PATCH — só os campos enviados são alterados).
+export async function atualizarEvento({ id, titulo, inicio, fim, descricao, cor }) {
+  if (!id) throw new Error('id do evento é obrigatório');
+  const tz = config.google.timezone;
+  const body = {};
+  if (titulo !== undefined) body.summary = titulo;
+  if (descricao !== undefined) body.description = descricao;
+  if (inicio) body.start = { dateTime: inicio, timeZone: tz };
+  if (fim) body.end = { dateTime: fim, timeZone: tz };
+  const cid = corId(cor);
+  if (cid) body.colorId = cid;
+  const ev = await calFetch(`calendars/${calId()}/events/${encodeURIComponent(id)}`, 'PATCH', body);
+  return { id: ev.id, link: ev.htmlLink };
+}
+
+// Apaga/cancela um evento pelo id.
+export async function apagarEvento({ id }) {
+  if (!id) throw new Error('id do evento é obrigatório');
+  await calFetch(`calendars/${calId()}/events/${encodeURIComponent(id)}`, 'DELETE');
+  return { ok: true };
 }
 
 // ── helpers de data ──────────────────────────────────────────

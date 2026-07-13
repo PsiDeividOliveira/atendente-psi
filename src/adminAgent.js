@@ -6,7 +6,7 @@ import { buildAdminPrompt } from './prompt.js';
 import { getHistory, pushMessage } from './memory.js';
 import * as db from './db.js';
 import { resolverPorId } from './escalation.js';
-import { criarEvento, criarTarefa, listarProximos } from './calendar.js';
+import { criarEvento, criarTarefa, listarProximos, atualizarEvento, apagarEvento } from './calendar.js';
 
 const anthropic = new Anthropic({ apiKey: config.claude.apiKey });
 
@@ -117,10 +117,37 @@ const TOOLS = [
   },
   {
     name: 'listar_agenda',
-    description: 'Lista os próximos compromissos/tarefas. Leitura.',
+    description: 'Lista os próximos compromissos/tarefas (com id de cada um). Leitura. Use antes de editar/apagar pra achar o id.',
     input_schema: {
       type: 'object',
       properties: { dias: { type: 'number', description: 'Quantos dias à frente (padrão 7)' } },
+    },
+  },
+  {
+    name: 'editar_compromisso',
+    description:
+      'Edita um evento existente (título, horário, descrição ou cor). Primeiro use listar_agenda pra achar o id. Confirme com o Deivid antes.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', description: 'ID do evento (obtido via listar_agenda)' },
+        titulo: { type: 'string' },
+        inicio: { type: 'string', description: 'Novo início "YYYY-MM-DDTHH:MM:SS". Ao mudar o horário, envie inicio E fim.' },
+        fim: { type: 'string', description: 'Novo fim "YYYY-MM-DDTHH:MM:SS".' },
+        descricao: { type: 'string' },
+        cor: { type: 'string', description: 'vermelho, laranja, amarelo, verde, azul, roxo, rosa, cinza.' },
+      },
+      required: ['id'],
+    },
+  },
+  {
+    name: 'apagar_compromisso',
+    description:
+      'Apaga/cancela um evento da agenda pelo id. Use listar_agenda pra achar o id. SEMPRE confirme com o Deivid antes — é irreversível.',
+    input_schema: {
+      type: 'object',
+      properties: { id: { type: 'string', description: 'ID do evento (obtido via listar_agenda)' } },
+      required: ['id'],
     },
   },
 ];
@@ -196,9 +223,27 @@ async function runTool(name, input, autorizado) {
       case 'listar_agenda': {
         try {
           const evs = await listarProximos({ dias: input.dias || 7 });
-          return evs.length ? evs.map((x) => `• ${x.inicio} — ${x.titulo}`).join('\n') : 'Nada agendado nos próximos dias.';
+          return evs.length
+            ? evs.map((x) => `• [id:${x.id}] ${x.inicio} — ${x.titulo}`).join('\n')
+            : 'Nada agendado nos próximos dias.';
         } catch (e) {
           return `Não consegui ler a agenda: ${e.message}`;
+        }
+      }
+      case 'editar_compromisso': {
+        try {
+          await atualizarEvento(input);
+          return `OK. Compromisso atualizado.`;
+        } catch (e) {
+          return `Não consegui editar: ${e.message}`;
+        }
+      }
+      case 'apagar_compromisso': {
+        try {
+          await apagarEvento(input);
+          return `OK. Compromisso apagado da agenda.`;
+        } catch (e) {
+          return `Não consegui apagar: ${e.message}`;
         }
       }
       default:
