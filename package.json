@@ -1,0 +1,19 @@
+{
+  "name": "atendente-psi",
+  "version": "0.2.0",
+  "description": "Atendente de WhatsApp da Psi. Deivid Oliveira — Evolution API + Claude + Postgres, com agente-admin por conversa e escalação com aprendizado.",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.68.0",
+    "express": "^5.1.0",
+    "pg": "^8.13.1"
+  }
+}

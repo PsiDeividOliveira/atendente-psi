@@ -1,0 +1,80 @@
+{
+  "_nota": "Fallback usado quando a planilha Google ainda não está configurada. A fonte da verdade é o Google Sheets — edite lá. Preços/links extraídos das páginas em 2026-07 e SUJEITOS A MUDANÇA (Deivid vai passar as URLs definitivas).",
+  "produtos": [
+    {
+      "id": "interpretacao-desenhos",
+      "nome": "Curso Interpretação de Desenhos",
+      "tipo": "curso",
+      "resumo": "Curso 100% online pra interpretar desenhos de crianças e adolescentes e identificar indicadores emocionais.",
+      "para_quem": "Pais, professores, psicólogos, terapeutas e quem trabalha com criança/adolescente.",
+      "detalhes": "+20h de vídeo, 5 módulos, 2 anos de acesso, certificado, bônus de minicursos de Autismo e TDAH, inclui o livro.",
+      "preco_avista": "R$ 299,00",
+      "preco_parcelado": "12x de R$ 30,92",
+      "garantia": "7 dias incondicional",
+      "link": "https://psideividoliveira.com/interpretacaodesenhos/",
+      "ativo": true
+    },
+    {
+      "id": "pfister",
+      "nome": "Curso Pfister (Teste das Pirâmides Coloridas)",
+      "tipo": "curso",
+      "resumo": "Formação em avaliação psicológica com o Teste de Pfister (TPC e TPC-i 2026): aplicação, correção e interpretação.",
+      "para_quem": "Psicólogos e estudantes de psicologia; perícia de trânsito, porte de armas, forense e clínica. Certificado só para psicólogos.",
+      "detalhes": "+10h de aulas, 100% online, 2 anos de acesso, certificado digital, bônus (e-book, comunidade, correção AvalPsico).",
+      "preco_avista": "R$ 299,00",
+      "preco_parcelado": "12x de R$ 30,92",
+      "garantia": "7 dias incondicional",
+      "link": "https://psideividoliveira.com/curso-pfister/",
+      "ativo": true
+    },
+    {
+      "id": "formacao-psicanalise-espiritualidade",
+      "nome": "Formação Psicanálise e Espiritualidade (Turma 2026)",
+      "tipo": "formacao",
+      "resumo": "Formação de 12 meses que integra teologia e psicanálise, com Pe. Fábio Marinho e Deivid Oliveira.",
+      "para_quem": "Quem busca cura pessoal, aprofundamento espiritual, e profissionais da escuta (padres, religiosos, agentes pastorais, líderes).",
+      "detalhes": "12 meses, 180h, 17 módulos em 4 eixos, 17 e-books, supervisão de casos, certificado Casa Santa Sophia. Bônus: curso Hierarquia dos Anjos, live exclusiva e encaminhamento de pacientes.",
+      "preco_avista": "R$ 2.297,90",
+      "preco_parcelado": "12x de R$ 237,66",
+      "garantia": "7 dias incondicional",
+      "link": "https://formacaoempsicanalise.padrefabiomarinho.com/",
+      "ativo": true
+    },
+    {
+      "id": "livro-desenhos",
+      "nome": "Livro: Desenhos — a linguagem oculta da infância e adolescência",
+      "tipo": "livro",
+      "resumo": "Livro do Deivid sobre interpretar e analisar desenhos infantojuvenis.",
+      "para_quem": "Pais, professores, psicólogos e quem trabalha com criança/adolescente.",
+      "detalhes": "Disponível em e-book e físico.",
+      "preco_avista": "E-book R$ 29,90 · Físico (Uiclap) R$ 66,75 · Físico (Amazon) R$ 84,32",
+      "preco_parcelado": "",
+      "garantia": "",
+      "link": "https://loja.uiclap.com/titulo/ua51628/",
+      "ativo": true
+    }
+  ],
+  "config": {
+    "valor_sessao_clinica": "A CONFIRMAR (Deivid preenche na planilha)",
+    "modalidade_clinica": "Atendimento online, para todo o Brasil.",
+    "tom_de_voz": "Caloroso e profissional, tratando por você. Acolhedor, sem jargão, nunca deixa a pessoa sem resposta.",
+    "campos_formulario_palestra": "nome, tipo (empresa/igreja/escola/entrevista/formação), cidade, data pretendida, tema, tamanho do público, contato",
+    "crp": "04/50559",
+    "endereco": "Rua Lúcia Ferreira da Silva, 155 — Patos de Minas/MG",
+    "atendimento_horario": "A CONFIRMAR",
+    "instagram": "https://www.instagram.com/psideividoliveira",
+    "youtube": "https://www.youtube.com/@PsiDeividOliveira",
+    "tiktok": "https://www.tiktok.com/@psideividoliveira",
+    "linkedin": "https://www.linkedin.com/in/psi-deivid-oliveira"
+  },
+  "faq": [
+    {
+      "pergunta": "O atendimento é presencial ou online?",
+      "resposta": "O atendimento clínico do Deivid é online, para todo o Brasil."
+    },
+    {
+      "pergunta": "Os cursos dão certificado?",
+      "resposta": "Sim. Interpretação de Desenhos e Pfister têm certificado de conclusão (o do Pfister é exclusivo para psicólogos)."
+    }
+  ]
+}
