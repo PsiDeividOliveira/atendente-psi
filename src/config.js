@@ -22,6 +22,13 @@ export const config = {
     model: process.env.OPENROUTER_TRANSCRIBE_MODEL || 'google/gemini-2.5-flash',
   },
 
+  // Google Calendar (agenda do Deivid) — via conta de serviço (service account).
+  google: {
+    serviceAccountJson: process.env.GOOGLE_SERVICE_ACCOUNT_JSON || '',
+    calendarId: process.env.GOOGLE_CALENDAR_ID || 'primary',
+    timezone: process.env.GOOGLE_TIMEZONE || 'America/Sao_Paulo',
+  },
+
   db: {
     url: process.env.DATABASE_URL || '',
   },

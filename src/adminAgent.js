@@ -6,6 +6,7 @@ import { buildAdminPrompt } from './prompt.js';
 import { getHistory, pushMessage } from './memory.js';
 import * as db from './db.js';
 import { resolverPorId } from './escalation.js';
+import { criarEvento, criarTarefa, listarProximos } from './calendar.js';
 
 const anthropic = new Anthropic({ apiKey: config.claude.apiKey });
 
@@ -84,6 +85,42 @@ const TOOLS = [
       required: ['id', 'resposta'],
     },
   },
+  {
+    name: 'agendar_compromisso',
+    description:
+      'Cria um compromisso com hora no Google Calendar do Deivid. Confirme os dados antes.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        titulo: { type: 'string', description: 'Título do compromisso' },
+        inicio: { type: 'string', description: 'Início: "YYYY-MM-DDTHH:MM:SS" (horário de Brasília)' },
+        fim: { type: 'string', description: 'Fim: "YYYY-MM-DDTHH:MM:SS". Se não souber, use início + 1h.' },
+        descricao: { type: 'string', description: 'Detalhes/observações (opcional)' },
+      },
+      required: ['titulo', 'inicio', 'fim'],
+    },
+  },
+  {
+    name: 'criar_tarefa',
+    description: 'Cria uma tarefa (evento de dia inteiro) no Google Calendar do Deivid.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        titulo: { type: 'string' },
+        quando: { type: 'string', description: 'Dia: "YYYY-MM-DD". Se vazio, é hoje.' },
+        descricao: { type: 'string' },
+      },
+      required: ['titulo'],
+    },
+  },
+  {
+    name: 'listar_agenda',
+    description: 'Lista os próximos compromissos/tarefas. Leitura.',
+    input_schema: {
+      type: 'object',
+      properties: { dias: { type: 'number', description: 'Quantos dias à frente (padrão 7)' } },
+    },
+  },
 ];
 
 const ESCRITAS = new Set(['alterar_produto', 'definir_config', 'adicionar_faq', 'remover_faq', 'responder_pendencia']);
@@ -135,6 +172,32 @@ async function runTool(name, input, autorizado) {
         return r.ok
           ? `OK. Repassei pra pessoa (pendência #${input.id}) e guardei na FAQ.`
           : `Não deu: ${r.motivo}.`;
+      }
+      case 'agendar_compromisso': {
+        try {
+          await criarEvento(input);
+          return `OK. Compromisso "${input.titulo}" agendado para ${input.inicio}.`;
+        } catch (e) {
+          const dica = e.message.includes('não configurada') ? ' (a agenda Google ainda não foi conectada)' : '';
+          return `Não consegui agendar: ${e.message}${dica}`;
+        }
+      }
+      case 'criar_tarefa': {
+        try {
+          await criarTarefa(input);
+          return `OK. Tarefa "${input.titulo}" criada${input.quando ? ' para ' + input.quando : ' para hoje'}.`;
+        } catch (e) {
+          const dica = e.message.includes('não configurada') ? ' (a agenda Google ainda não foi conectada)' : '';
+          return `Não consegui criar a tarefa: ${e.message}${dica}`;
+        }
+      }
+      case 'listar_agenda': {
+        try {
+          const evs = await listarProximos({ dias: input.dias || 7 });
+          return evs.length ? evs.map((x) => `• ${x.inicio} — ${x.titulo}`).join('\n') : 'Nada agendado nos próximos dias.';
+        } catch (e) {
+          return `Não consegui ler a agenda: ${e.message}`;
+        }
       }
       default:
         return `Ferramenta desconhecida: ${name}`;
