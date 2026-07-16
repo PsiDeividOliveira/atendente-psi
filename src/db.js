@@ -85,6 +85,12 @@ create table if not exists historico (
   criado_em timestamptz default now()
 );
 create index if not exists idx_historico_contato on historico (contato, id);
+create table if not exists pausas (
+  contato text primary key,
+  ate timestamptz not null,
+  motivo text,
+  criado_em timestamptz default now()
+);
 `;
 
 export async function initDb() {
@@ -293,4 +299,30 @@ export async function getHistorico(contato, limite = 20) {
 
 export async function limparHistorico(contato) {
   await q('delete from historico where contato = $1', [contato]);
+}
+
+// ── Pausa de atendimento (handoff: o Deivid assumiu a conversa) ─
+// Enquanto pausado, o bot não responde aquele contato. Renova a cada ação humana.
+export async function pausarContato(contato, minutos, motivo = 'humano assumiu') {
+  await q(
+    `insert into pausas (contato, ate, motivo, criado_em)
+     values ($1, now() + ($2 || ' minutes')::interval, $3, now())
+     on conflict (contato) do update set ate=excluded.ate, motivo=excluded.motivo, criado_em=now()`,
+    [contato, String(minutos), motivo],
+  );
+}
+
+export async function retomarContato(contato) {
+  await q('delete from pausas where contato = $1', [contato]);
+}
+
+// true se o contato está pausado agora (ate ainda no futuro).
+export async function contatoPausado(contato) {
+  const { rows } = await q('select 1 from pausas where contato = $1 and ate > now() limit 1', [contato]);
+  return rows.length > 0;
+}
+
+export async function listarPausas() {
+  const { rows } = await q('select contato, ate, motivo from pausas where ate > now() order by ate desc');
+  return rows;
 }

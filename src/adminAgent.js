@@ -14,6 +14,13 @@ const anthropic = new Anthropic({ apiKey: config.claude.apiKey });
 
 const ADMIN_KEY = 'admin:' + (config.admin.number || 'x'); // chave de histórico separada
 
+// Normaliza número BR (tira o 9º dígito extra) — igual ao index.js, pra bater com as pausas.
+function normDig(num) {
+  const d = String(num || '').replace(/\D/g, '');
+  if (d.length === 13 && d.startsWith('55') && d[4] === '9') return d.slice(0, 4) + d.slice(5);
+  return d;
+}
+
 const TOOLS = [
   {
     name: 'alterar_produto',
@@ -175,6 +182,33 @@ const TOOLS = [
       required: ['id'],
     },
   },
+  {
+    name: 'pausar_atendimento',
+    description:
+      'Faz o bot PARAR de responder um contato (quando o Deivid vai cuidar da conversa pessoalmente). Informe o número com DDI (ex.: 5534988887777).',
+    input_schema: {
+      type: 'object',
+      properties: {
+        contato: { type: 'string', description: 'Número do cliente, só dígitos com DDI' },
+        minutos: { type: 'number', description: 'Por quantos minutos ficar em silêncio (opcional).' },
+      },
+      required: ['contato'],
+    },
+  },
+  {
+    name: 'retomar_atendimento',
+    description: 'Faz o bot VOLTAR a responder um contato que estava pausado (o Deivid terminou de atender).',
+    input_schema: {
+      type: 'object',
+      properties: { contato: { type: 'string', description: 'Número do cliente, só dígitos com DDI' } },
+      required: ['contato'],
+    },
+  },
+  {
+    name: 'listar_pausas',
+    description: 'Lista os contatos em silêncio agora (que o Deivid assumiu). Leitura.',
+    input_schema: { type: 'object', properties: {} },
+  },
 ];
 
 const ESCRITAS = new Set(['alterar_produto', 'definir_config', 'adicionar_faq', 'remover_faq', 'responder_pendencia']);
@@ -286,6 +320,24 @@ async function runTool(name, input, autorizado) {
         } catch (e) {
           return `Não consegui apagar: ${e.message}`;
         }
+      }
+      case 'pausar_atendimento': {
+        const c = normDig(input.contato);
+        if (!c) return 'Preciso do número do contato (só dígitos, com DDI, ex.: 5534988887777).';
+        await db.pausarContato(c, input.minutos || config.humanTakeoverPauseMin, 'pausado pelo Deivid');
+        return `OK. Não vou mais responder ${c} — você assume. É só me dizer pra voltar quando terminar.`;
+      }
+      case 'retomar_atendimento': {
+        const c = normDig(input.contato);
+        if (!c) return 'Preciso do número do contato.';
+        await db.retomarContato(c);
+        return `OK. Voltei a responder ${c}.`;
+      }
+      case 'listar_pausas': {
+        const ps = await db.listarPausas();
+        return ps.length
+          ? 'Em silêncio agora:\n' + ps.map((p) => `• ${p.contato} (${p.motivo || '—'})`).join('\n')
+          : 'Nenhum contato pausado — estou respondendo todo mundo.';
       }
       default:
         return `Ferramenta desconhecida: ${name}`;

@@ -3,12 +3,13 @@
 
 import express from 'express';
 import { config } from './config.js';
-import { initDb } from './db.js';
+import { initDb, pausarContato, contatoPausado } from './db.js';
 import { handleCustomer, setLeadNotifier } from './agent.js';
 import { handleAdmin } from './adminAgent.js';
 import { resolverPorCitacao, varrerTimeouts } from './escalation.js';
-import { sendText, sendTyping, getMediaBase64 } from './evolution.js';
+import { sendText, sendTyping, getMediaBase64, foiEnviadoPeloBot } from './evolution.js';
 import { transcribeAudio } from './transcribe.js';
+import { pushMessage } from './memory.js';
 
 const app = express();
 app.use(express.json({ limit: '2mb' }));
@@ -21,7 +22,6 @@ function parseEvent(body) {
   const data = body?.data;
   if (!data) return null;
   const key = data.key || {};
-  if (key.fromMe) return null;
   const jid = key.remoteJid || '';
   if (jid.endsWith('@g.us')) return null; // ignora grupos
   const number = (jid.split('@')[0] || '').replace(/\D/g, '');
@@ -51,6 +51,8 @@ function parseEvent(body) {
     audio,
     media,
     key: data.key || null,
+    fromMe: Boolean(key.fromMe),
+    msgId: key.id || null,
   };
 }
 
@@ -95,6 +97,20 @@ app.post('/webhook', async (req, res) => {
   try {
     const evt = parseEvent(req.body);
     if (!evt) return;
+
+    // Mensagem que SAIU do WhatsApp do bot (fromMe): ou é o próprio bot (eco da
+    // resposta), ou é o Deivid respondendo um cliente manualmente (assumiu a conversa).
+    if (evt.fromMe) {
+      if (foiEnviadoPeloBot(evt.msgId)) return; // eco do próprio bot → ignora
+      if (mesmoNumero(evt.number, config.admin.number)) return; // conversa do próprio admin
+      try {
+        await pausarContato(normBR(evt.number), config.humanTakeoverPauseMin, 'Deivid assumiu');
+        console.log(`[handoff] Deivid assumiu ${evt.number} — bot em silêncio por ${config.humanTakeoverPauseMin}min`);
+      } catch (e) {
+        console.error('[handoff]', e.message);
+      }
+      return;
+    }
 
     // Áudio (nota de voz) → transcreve pra texto antes de rotear.
     if (!evt.text && evt.audio && evt.key) {
@@ -153,7 +169,13 @@ app.post('/webhook', async (req, res) => {
       return;
     }
 
-    // Cliente comum
+    // Cliente comum — mas se o Deivid assumiu essa conversa, o bot fica em silêncio.
+    if (await contatoPausado(normBR(evt.number))) {
+      // Guarda a mensagem no histórico (pra manter contexto se o bot voltar), sem responder.
+      try { if (evt.text) await pushMessage(evt.number, { role: 'user', content: evt.text }); } catch {}
+      console.log(`[handoff] ${evt.number} está com o Deivid — bot não respondeu.`);
+      return;
+    }
     await sendTyping(evt.number, 1200);
     const reply = await handleCustomer(evt.number, evt.text, evt.pushName, attachment);
     await sendText(evt.number, reply);

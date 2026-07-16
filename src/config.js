@@ -56,6 +56,10 @@ export const config = {
   // Minutos até o cliente receber o fallback caso o Deivid não responda a escalação
   escalationTimeoutMin: Number(process.env.ESCALATION_TIMEOUT_MIN || 30),
 
+  // Quando o Deivid responde um cliente manualmente (assume a conversa), o bot
+  // fica em silêncio com aquele contato por este tempo. Cada resposta manual renova.
+  humanTakeoverPauseMin: Number(process.env.HUMAN_TAKEOVER_PAUSE_MIN || 360),
+
   // Segundos de cache da base antes de reler do banco (invalidado em cada escrita)
   cacheTtl: Number(process.env.CACHE_TTL || 60),
 };

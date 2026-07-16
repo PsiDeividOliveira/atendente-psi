@@ -21,12 +21,31 @@ async function evoFetch(path, body) {
   return res.json().catch(() => ({}));
 }
 
+// Rastreia ids das mensagens que o PRÓPRIO bot enviou, pra distinguir do
+// Deivid respondendo manualmente (ambos chegam como fromMe no webhook).
+const enviadosPeloBot = new Map(); // id -> timestamp
+const ECHO_TTL_MS = 10 * 60 * 1000;
+function registrarEnvio(id) {
+  if (!id) return;
+  const agora = Date.now();
+  enviadosPeloBot.set(id, agora);
+  // limpeza preguiçosa dos antigos
+  for (const [k, t] of enviadosPeloBot) {
+    if (agora - t > ECHO_TTL_MS) enviadosPeloBot.delete(k);
+  }
+}
+export function foiEnviadoPeloBot(id) {
+  return Boolean(id) && enviadosPeloBot.has(id);
+}
+
 // Envia mensagem de texto para um número (formato "5534999030329").
 export async function sendText(number, text) {
-  return evoFetch(`/message/sendText/${inst()}`, {
+  const resp = await evoFetch(`/message/sendText/${inst()}`, {
     number,
     text,
   });
+  registrarEnvio(resp?.key?.id); // marca como "eco do bot" pra não confundir com handoff
+  return resp;
 }
 
 // Baixa a mídia (áudio/imagem) de uma mensagem em base64, via Evolution.
