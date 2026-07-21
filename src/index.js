@@ -3,7 +3,7 @@
 
 import express from 'express';
 import { config } from './config.js';
-import { initDb, pausarContato, contatoPausado } from './db.js';
+import { initDb, pausarContato, contatoPausado, botSilenciado } from './db.js';
 import { handleCustomer, setLeadNotifier } from './agent.js';
 import { handleAdmin } from './adminAgent.js';
 import { resolverPorCitacao, varrerTimeouts } from './escalation.js';
@@ -166,6 +166,14 @@ app.post('/webhook', async (req, res) => {
       // 2) Senão, é comando de administração.
       const reply = await handleAdmin(evt.number, evt.text, attachment);
       await sendText(evt.number, reply);
+      return;
+    }
+
+    // Bot silenciado por completo (modo inoperante que o Deivid ativou)?
+    // O admin nunca cai aqui — ele já foi tratado acima e sempre consegue reativar.
+    if (await botSilenciado()) {
+      try { if (evt.text) await pushMessage(evt.number, { role: 'user', content: evt.text }); } catch {}
+      console.log(`[silencio] bot inoperante — não respondi ${evt.number}.`);
       return;
     }
 

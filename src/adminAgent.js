@@ -14,6 +14,18 @@ const anthropic = new Anthropic({ apiKey: config.claude.apiKey });
 
 const ADMIN_KEY = 'admin:' + (config.admin.number || 'x'); // chave de histórico separada
 
+// Formata data/hora no fuso de Brasília, pro Deivid ler bonito.
+function fmtData(d) {
+  if (!d) return '(sem data)';
+  try {
+    return new Intl.DateTimeFormat('pt-BR', {
+      timeZone: 'America/Sao_Paulo', dateStyle: 'short', timeStyle: 'short',
+    }).format(new Date(d));
+  } catch {
+    return String(d);
+  }
+}
+
 // Normaliza número BR (tira o 9º dígito extra) — igual ao index.js, pra bater com as pausas.
 function normDig(num) {
   const d = String(num || '').replace(/\D/g, '');
@@ -209,6 +221,32 @@ const TOOLS = [
     description: 'Lista os contatos em silêncio agora (que o Deivid assumiu). Leitura.',
     input_schema: { type: 'object', properties: {} },
   },
+  {
+    name: 'silenciar_bot',
+    description:
+      'Deixa o bot INOPERANTE pra todos os clientes (o Deivid continua falando com você normalmente). Informe minutos OU uma data/hora de retorno. Confirme antes.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        minutos: { type: 'number', description: 'Ficar inoperante por quantos minutos (ex.: 120 = 2h).' },
+        ate: {
+          type: 'string',
+          description: 'Alternativa: voltar a operar nesta data/hora, formato "YYYY-MM-DDTHH:MM:SS" (horário de Brasília).',
+        },
+        motivo: { type: 'string', description: 'Motivo (opcional), ex.: "viagem", "consultas".' },
+      },
+    },
+  },
+  {
+    name: 'reativar_bot',
+    description: 'Tira o bot do modo inoperante AGORA — volta a atender os clientes ("pode voltar agora").',
+    input_schema: { type: 'object', properties: {} },
+  },
+  {
+    name: 'status_bot',
+    description: 'Diz se o bot está operando ou inoperante, e até quando. Leitura.',
+    input_schema: { type: 'object', properties: {} },
+  },
 ];
 
 const ESCRITAS = new Set(['alterar_produto', 'definir_config', 'adicionar_faq', 'remover_faq', 'responder_pendencia']);
@@ -338,6 +376,27 @@ async function runTool(name, input, autorizado) {
         return ps.length
           ? 'Em silêncio agora:\n' + ps.map((p) => `• ${p.contato} (${p.motivo || '—'})`).join('\n')
           : 'Nenhum contato pausado — estou respondendo todo mundo.';
+      }
+      case 'silenciar_bot': {
+        if (input.ate) {
+          await db.silenciarAte(input.ate, input.motivo || 'silenciado pelo Deivid');
+        } else if (input.minutos && Number(input.minutos) > 0) {
+          await db.silenciarPorMinutos(Number(input.minutos), input.motivo || 'silenciado pelo Deivid');
+        } else {
+          return 'Preciso saber por quanto tempo: um número de minutos OU uma data/hora de retorno.';
+        }
+        const st = await db.statusSilencio();
+        return `OK. Fiquei inoperante pros clientes. Volto ${fmtData(st?.ate)}. Se quiser antes, é só dizer "pode voltar agora".`;
+      }
+      case 'reativar_bot': {
+        await db.reativarBot();
+        return 'OK. Voltei a atender os clientes normalmente. 👊';
+      }
+      case 'status_bot': {
+        const st = await db.statusSilencio();
+        return st
+          ? `Estou INOPERANTE pros clientes até ${fmtData(st.ate)}${st.motivo ? ` (${st.motivo})` : ''}.`
+          : 'Estou operando normalmente, atendendo os clientes.';
       }
       default:
         return `Ferramenta desconhecida: ${name}`;

@@ -323,6 +323,46 @@ export async function contatoPausado(contato) {
 }
 
 export async function listarPausas() {
-  const { rows } = await q('select contato, ate, motivo from pausas where ate > now() order by ate desc');
+  const { rows } = await q(
+    'select contato, ate, motivo from pausas where ate > now() and contato <> $1 order by ate desc',
+    [GLOBAL_KEY],
+  );
   return rows;
+}
+
+// ── Silêncio GLOBAL (o bot inteiro fica inoperante) ──────────
+// Usa a mesma tabela de pausas, com uma chave reservada. O admin nunca é bloqueado.
+export const GLOBAL_KEY = '__GLOBAL__';
+
+// Silencia por X minutos a partir de agora.
+export async function silenciarPorMinutos(minutos, motivo = 'silenciado pelo Deivid') {
+  await pausarContato(GLOBAL_KEY, minutos, motivo);
+}
+
+// Silencia até uma data/hora ABSOLUTA, interpretada no fuso de Brasília.
+// quandoISO = 'YYYY-MM-DDTHH:MM:SS'
+export async function silenciarAte(quandoISO, motivo = 'silenciado pelo Deivid') {
+  await q(
+    `insert into pausas (contato, ate, motivo, criado_em)
+     values ($1, ($2::timestamp at time zone 'America/Sao_Paulo'), $3, now())
+     on conflict (contato) do update set ate=excluded.ate, motivo=excluded.motivo, criado_em=now()`,
+    [GLOBAL_KEY, quandoISO, motivo],
+  );
+}
+
+export async function reativarBot() {
+  await retomarContato(GLOBAL_KEY);
+}
+
+export async function botSilenciado() {
+  return contatoPausado(GLOBAL_KEY);
+}
+
+// Retorna { ate, motivo } se estiver silenciado, senão null.
+export async function statusSilencio() {
+  const { rows } = await q(
+    'select ate, motivo from pausas where contato = $1 and ate > now() limit 1',
+    [GLOBAL_KEY],
+  );
+  return rows[0] || null;
 }
