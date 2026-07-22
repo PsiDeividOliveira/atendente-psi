@@ -12,6 +12,7 @@ import {
 import {
   criarTarefa, listarTarefas, concluirTarefa, reabrirTarefa, editarTarefa, apagarTarefa,
 } from './tasks.js';
+import { enviarComoDeivid } from './assinatura.js';
 
 const anthropic = new Anthropic({ apiKey: config.claude.apiKey });
 
@@ -301,6 +302,19 @@ const TOOLS = [
     description: 'Diz se o bot está operando ou inoperante, e até quando. Leitura.',
     input_schema: { type: 'object', properties: {} },
   },
+  {
+    name: 'enviar_mensagem',
+    description:
+      'Envia uma mensagem a um cliente EM NOME DO DEIVID (vai assinada como ele, não como assistente). Use quando o Deivid ditar o que quer dizer pra alguém. Confirme o texto antes de enviar.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        contato: { type: 'string', description: 'Número do cliente, só dígitos com DDI' },
+        texto: { type: 'string', description: 'A mensagem, exatamente como deve chegar' },
+      },
+      required: ['contato', 'texto'],
+    },
+  },
 ];
 
 const ESCRITAS = new Set(['alterar_produto', 'definir_config', 'adicionar_faq', 'remover_faq', 'responder_pendencia']);
@@ -493,6 +507,19 @@ async function runTool(name, input, autorizado) {
         return st
           ? `Estou INOPERANTE pros clientes até ${fmtData(st.ate)}${st.motivo ? ` (${st.motivo})` : ''}.`
           : 'Estou operando normalmente, atendendo os clientes.';
+      }
+      case 'enviar_mensagem': {
+        const c = normDig(input.contato);
+        if (!c) return 'Preciso do número do contato (só dígitos, com DDI).';
+        if (!input.texto) return 'Preciso do texto da mensagem.';
+        try {
+          await enviarComoDeivid(c, input.texto);
+          // Você entrou na conversa: eu me calo com esse contato pra não falarmos junto.
+          await db.pausarContato(c, config.humanTakeoverPauseMin, 'Deivid falou pelo assistente');
+          return `Enviado pro ${c} assinado como você. Já fiquei em silêncio nessa conversa pra não atrapalhar.`;
+        } catch (e) {
+          return `Não consegui enviar: ${e.message}`;
+        }
       }
       default:
         return `Ferramenta desconhecida: ${name}`;

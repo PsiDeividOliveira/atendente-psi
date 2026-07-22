@@ -10,6 +10,7 @@ import { resolverPorCitacao, varrerTimeouts } from './escalation.js';
 import { sendText, sendTyping, getMediaBase64, foiEnviadoPeloBot } from './evolution.js';
 import { transcribeAudio } from './transcribe.js';
 import { pushMessage } from './memory.js';
+import { enviarComoBot } from './assinatura.js';
 
 const app = express();
 app.use(express.json({ limit: '2mb' }));
@@ -123,7 +124,7 @@ app.post('/webhook', async (req, res) => {
         }
       } catch (e) {
         console.error('[audio] falha na transcrição:', e.message);
-        await sendText(
+        await enviarComoBot(
           evt.number,
           'Recebi seu áudio, mas tive um probleminha pra ouvir agora. Pode me mandar por texto que eu te ajudo? 😊',
         ).catch(() => {});
@@ -142,7 +143,7 @@ app.post('/webhook', async (req, res) => {
         } else if (evt.media.kind === 'document' && /pdf/i.test(mt) && base64) {
           attachment = { kind: 'document', media_type: 'application/pdf', data: base64 };
         } else if (evt.media.kind === 'document') {
-          await sendText(
+          await enviarComoBot(
             evt.number,
             'Recebi seu documento, mas por enquanto só consigo ler PDF. Pode me mandar em PDF ou me contar o que é? 😊',
           ).catch(() => {});
@@ -186,7 +187,7 @@ app.post('/webhook', async (req, res) => {
     }
     await sendTyping(evt.number, 1200);
     const reply = await handleCustomer(evt.number, evt.text, evt.pushName, attachment);
-    await sendText(evt.number, reply);
+    await enviarComoBot(evt.number, reply);
   } catch (err) {
     console.error('[webhook] erro:', err);
   }
