@@ -7,8 +7,11 @@ import { getHistory, pushMessage } from './memory.js';
 import * as db from './db.js';
 import { resolverPorId } from './escalation.js';
 import {
-  criarEvento, criarTarefa, listarProximos, atualizarEvento, apagarEvento, concluirEvento, cancelarEvento,
+  criarEvento, listarProximos, atualizarEvento, apagarEvento, concluirEvento, cancelarEvento,
 } from './calendar.js';
+import {
+  criarTarefa, listarTarefas, concluirTarefa, reabrirTarefa, editarTarefa, apagarTarefa,
+} from './tasks.js';
 
 const anthropic = new Anthropic({ apiKey: config.claude.apiKey });
 
@@ -127,16 +130,67 @@ const TOOLS = [
   },
   {
     name: 'criar_tarefa',
-    description: 'Cria uma tarefa (evento de dia inteiro) no Google Calendar do Deivid.',
+    description:
+      'Cria uma TAREFA de verdade no Google Tasks (aparece na aba Tarefas, com caixinha de concluir que o Deivid marca no celular). Use pra afazeres/lembretes, não pra compromissos com hora.',
     input_schema: {
       type: 'object',
       properties: {
         titulo: { type: 'string' },
-        quando: { type: 'string', description: 'Dia: "YYYY-MM-DD". Se vazio, é hoje.' },
-        descricao: { type: 'string' },
-        cor: { type: 'string', description: 'Cor (opcional): vermelho, laranja, amarelo, verde, azul, roxo, rosa, cinza.' },
+        quando: { type: 'string', description: 'Prazo (opcional): "YYYY-MM-DD". Sem isso, fica sem prazo.' },
+        descricao: { type: 'string', description: 'Notas da tarefa (opcional).' },
       },
       required: ['titulo'],
+    },
+  },
+  {
+    name: 'listar_tarefas',
+    description: 'Lista as tarefas do Google Tasks COM o id de cada uma. Leitura. Use antes de concluir/editar/apagar.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        incluir_concluidas: { type: 'boolean', description: 'Se true, mostra também as já concluídas.' },
+      },
+    },
+  },
+  {
+    name: 'concluir_tarefa',
+    description: 'Marca uma TAREFA como concluída (o check nativo). Ache o id com listar_tarefas.',
+    input_schema: {
+      type: 'object',
+      properties: { id: { type: 'string', description: 'ID da tarefa (via listar_tarefas)' } },
+      required: ['id'],
+    },
+  },
+  {
+    name: 'reabrir_tarefa',
+    description: 'Desmarca uma tarefa concluída (volta a pendente). Ache o id com listar_tarefas.',
+    input_schema: {
+      type: 'object',
+      properties: { id: { type: 'string', description: 'ID da tarefa (via listar_tarefas)' } },
+      required: ['id'],
+    },
+  },
+  {
+    name: 'editar_tarefa',
+    description: 'Altera título, prazo ou notas de uma tarefa. Ache o id com listar_tarefas.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string' },
+        titulo: { type: 'string' },
+        quando: { type: 'string', description: 'Novo prazo "YYYY-MM-DD".' },
+        descricao: { type: 'string' },
+      },
+      required: ['id'],
+    },
+  },
+  {
+    name: 'apagar_tarefa',
+    description: 'Remove uma tarefa de vez. Confirme com o Deivid antes. Ache o id com listar_tarefas.',
+    input_schema: {
+      type: 'object',
+      properties: { id: { type: 'string' } },
+      required: ['id'],
     },
   },
   {
@@ -311,10 +365,52 @@ async function runTool(name, input, autorizado) {
       case 'criar_tarefa': {
         try {
           await criarTarefa(input);
-          return `OK. Tarefa "${input.titulo}" criada${input.quando ? ' para ' + input.quando : ' para hoje'}.`;
+          return `OK. Tarefa "${input.titulo}" criada no Google Tasks${input.quando ? ' com prazo ' + input.quando : ''}. Você já pode marcar como concluída no celular.`;
         } catch (e) {
-          const dica = e.message.includes('não configurada') ? ' (a agenda Google ainda não foi conectada)' : '';
-          return `Não consegui criar a tarefa: ${e.message}${dica}`;
+          return `Não consegui criar a tarefa: ${e.message}`;
+        }
+      }
+      case 'listar_tarefas': {
+        try {
+          const ts = await listarTarefas({ incluirConcluidas: Boolean(input.incluir_concluidas) });
+          if (!ts.length) return 'Nenhuma tarefa na lista.';
+          return ts
+            .map((t) => `${t.concluida ? '✔️' : '▫️'} [id:${t.id}] ${t.titulo}${t.prazo ? ' (prazo ' + t.prazo + ')' : ''}`)
+            .join('\n');
+        } catch (e) {
+          return `Não consegui ler as tarefas: ${e.message}`;
+        }
+      }
+      case 'concluir_tarefa': {
+        try {
+          await concluirTarefa(input);
+          return 'OK. Tarefa marcada como concluída ✔️';
+        } catch (e) {
+          return `Não consegui concluir: ${e.message}`;
+        }
+      }
+      case 'reabrir_tarefa': {
+        try {
+          await reabrirTarefa(input);
+          return 'OK. Tarefa voltou a ficar pendente.';
+        } catch (e) {
+          return `Não consegui reabrir: ${e.message}`;
+        }
+      }
+      case 'editar_tarefa': {
+        try {
+          await editarTarefa(input);
+          return 'OK. Tarefa atualizada.';
+        } catch (e) {
+          return `Não consegui editar a tarefa: ${e.message}`;
+        }
+      }
+      case 'apagar_tarefa': {
+        try {
+          await apagarTarefa(input);
+          return 'OK. Tarefa removida.';
+        } catch (e) {
+          return `Não consegui apagar a tarefa: ${e.message}`;
         }
       }
       case 'listar_agenda': {

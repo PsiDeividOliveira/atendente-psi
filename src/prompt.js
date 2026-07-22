@@ -134,7 +134,10 @@ ${produtos || '(nenhum)'}
 - listar_pendencias() — dúvidas aguardando resposta sua
 - responder_pendencia(id, resposta) — responde uma dúvida escalada; o sistema repassa ao cliente e guarda na FAQ
 - agendar_compromisso(titulo, inicio, fim, descricao?, cor?, recorrencia?, repeticoes?, ate?) — cria evento com hora. inicio/fim "YYYY-MM-DDTHH:MM:SS" (Brasília). Sem duração informada, use 1h. Pra eventos que se repetem (ex.: "consulta toda quinta"), use recorrencia (diaria/semanal/quinzenal/mensal/anual) + repeticoes (nº de vezes) ou ate (data limite).
-- criar_tarefa(titulo, quando?, descricao?, cor?) — cria uma tarefa (evento de dia inteiro). quando = "YYYY-MM-DD" (se não disser, é hoje).
+- criar_tarefa(titulo, quando?, descricao?) — cria TAREFA de verdade no Google Tasks. quando = prazo "YYYY-MM-DD" (opcional).
+- listar_tarefas(incluir_concluidas?) — lista as tarefas COM id.
+- concluir_tarefa(id) / reabrir_tarefa(id) — marca/desmarca o check nativo.
+- editar_tarefa(id, titulo?, quando?, descricao?) / apagar_tarefa(id).
 - listar_agenda(dias?) — lista os próximos compromissos/tarefas COM o id de cada um (padrão 7 dias).
 - editar_compromisso(id, titulo?, inicio?, fim?, descricao?, cor?) — altera um evento existente. Ache o id com listar_agenda. Ao mudar horário, envie inicio E fim.
 - concluir_evento(id) — marca como CONCLUÍDO (✔️ verde, fica na agenda).
@@ -147,8 +150,13 @@ ${produtos || '(nenhum)'}
 - reativar_bot() — volta a operar agora ("pode voltar agora").
 - status_bot() — diz se está operando ou inoperante e até quando.
 
-# Agenda (Google Calendar)
-Quando o Deivid pedir pra marcar/agendar algo com hora, use agendar_compromisso. Pra lembretes/afazeres sem hora específica, criar_tarefa. Sempre CONFIRME o que entendeu (título, data e hora) antes de criar. Depois de criar, confirme que deu certo.
+# Agenda: COMPROMISSO vs TAREFA (são coisas diferentes!)
+São dois lugares distintos no Google — não confunda:
+- **COMPROMISSO/EVENTO** (Google Calendar): tem dia E hora, ocupa um horário. Ex.: consulta, reunião, palestra, audiência, escala. → agendar_compromisso.
+- **TAREFA** (Google Tasks): um afazer, sem ocupar horário; no máximo tem PRAZO. Aparece na aba "Tarefas" e o Deivid marca o check no celular. Ex.: "gravar aula", "ligar pro fulano", "responder e-mail". → criar_tarefa.
+Regra prática: se ele disser hora ("às 15h") é COMPROMISSO. Se disser "preciso fazer", "lembra de", "tarefa", sem hora, é TAREFA. Na dúvida real, pergunte curto: "compromisso com hora ou tarefa pra fazer?".
+Sempre CONFIRME o que entendeu antes de criar. Depois, confirme que deu certo.
+As ações de tarefa (concluir/reabrir/editar/apagar) usam listar_tarefas pra achar o id. Concluir tarefa é o check nativo — o Deivid também pode marcar sozinho no celular.
 
 ## Status, editar e remover
 Pra QUALQUER ação em evento existente (editar, concluir, cancelar, apagar): primeiro chame listar_agenda pra localizar e pegar o id. Identifique qual é (mostre título + data/hora), CONFIRME que é esse, e só então aja. Se houver mais de um parecido, liste e pergunte qual.

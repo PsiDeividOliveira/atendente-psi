@@ -29,6 +29,15 @@ export const config = {
     timezone: process.env.GOOGLE_TIMEZONE || 'America/Sao_Paulo',
   },
 
+  // Google Tasks (tarefas de verdade) — precisa de OAuth: conta de serviço NÃO
+  // alcança tarefas, só a agenda. O Deivid autorizou uma vez e geramos o refresh_token.
+  googleOauth: {
+    clientId: process.env.GOOGLE_OAUTH_CLIENT_ID || '',
+    clientSecret: process.env.GOOGLE_OAUTH_CLIENT_SECRET || '',
+    refreshToken: process.env.GOOGLE_OAUTH_REFRESH_TOKEN || '',
+    taskListId: process.env.GOOGLE_TASKLIST_ID || '', // vazio = lista padrão
+  },
+
   db: {
     url: process.env.DATABASE_URL || '',
   },
