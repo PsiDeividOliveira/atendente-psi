@@ -139,6 +139,7 @@ const TOOLS = [
         titulo: { type: 'string' },
         quando: { type: 'string', description: 'Prazo (opcional): "YYYY-MM-DD". Sem isso, fica sem prazo.' },
         descricao: { type: 'string', description: 'Notas da tarefa (opcional).' },
+        concluida: { type: 'boolean', description: 'Se true, já cria a tarefa marcada como concluída (check preenchido). Use quando o Deivid disser "tarefa já feita/concluída".' },
       },
       required: ['titulo'],
     },
@@ -379,6 +380,9 @@ async function runTool(name, input, autorizado) {
       case 'criar_tarefa': {
         try {
           await criarTarefa(input);
+          if (input.concluida) {
+            return `OK. Tarefa "${input.titulo}" criada JÁ CONCLUÍDA ✔️ no Google Tasks.`;
+          }
           return `OK. Tarefa "${input.titulo}" criada no Google Tasks${input.quando ? ' com prazo ' + input.quando : ''}. Você já pode marcar como concluída no celular.`;
         } catch (e) {
           return `Não consegui criar a tarefa: ${e.message}`;

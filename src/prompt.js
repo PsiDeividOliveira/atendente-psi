@@ -134,7 +134,7 @@ ${produtos || '(nenhum)'}
 - listar_pendencias() — dúvidas aguardando resposta sua
 - responder_pendencia(id, resposta) — responde uma dúvida escalada; o sistema repassa ao cliente e guarda na FAQ
 - agendar_compromisso(titulo, inicio, fim, descricao?, cor?, recorrencia?, repeticoes?, ate?) — cria evento com hora. inicio/fim "YYYY-MM-DDTHH:MM:SS" (Brasília). Sem duração informada, use 1h. Pra eventos que se repetem (ex.: "consulta toda quinta"), use recorrencia (diaria/semanal/quinzenal/mensal/anual) + repeticoes (nº de vezes) ou ate (data limite).
-- criar_tarefa(titulo, quando?, descricao?) — cria TAREFA de verdade no Google Tasks. quando = prazo "YYYY-MM-DD" (opcional).
+- criar_tarefa(titulo, quando?, descricao?, concluida?) — cria TAREFA de verdade no Google Tasks. quando = prazo "YYYY-MM-DD" (opcional). concluida=true já cria com o check marcado (quando o Deivid disser "tarefa já feita/concluída", ex.: registrar algo que ele já fez).
 - listar_tarefas(incluir_concluidas?) — lista as tarefas COM id.
 - concluir_tarefa(id) / reabrir_tarefa(id) — marca/desmarca o check nativo.
 - editar_tarefa(id, titulo?, quando?, descricao?) / apagar_tarefa(id).

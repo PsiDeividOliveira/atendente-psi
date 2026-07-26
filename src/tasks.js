@@ -78,12 +78,17 @@ function dueDe(quando) {
 }
 
 // Cria uma TAREFA real. quando = 'YYYY-MM-DD' (opcional = sem prazo).
-export async function criarTarefa({ titulo, quando, descricao }) {
+// concluida = true cria a tarefa já marcada como feita (check preenchido).
+export async function criarTarefa({ titulo, quando, descricao, concluida }) {
   const lista = await getListaId();
   const body = { title: titulo };
   if (descricao) body.notes = descricao;
   const due = dueDe(quando);
   if (due) body.due = due;
+  if (concluida) {
+    body.status = 'completed';
+    body.completed = due || new Date().toISOString(); // Tasks exige um horário de conclusão
+  }
   const t = await tasksFetch(`lists/${lista}/tasks`, 'POST', body);
   return { id: t.id, titulo: t.title, link: t.webViewLink };
 }
