@@ -570,7 +570,7 @@ export async function handleAdmin(number, userText, attachment = null) {
     for (let round = 0; round < 12; round++) {
       const resp = await anthropic.messages.create({
         model: config.claude.model,
-        max_tokens: 1024,
+        max_tokens: 8192, // alto: lotes grandes (ex.: 12 agendamentos) emitem muitas tool-calls numa resposta só
         system,
         tools: TOOLS,
         messages,
@@ -578,10 +578,20 @@ export async function handleAdmin(number, userText, attachment = null) {
       const textOut = resp.content.filter((b) => b.type === 'text').map((b) => b.text).join('\n').trim();
       if (textOut) finalText = textOut;
 
-      const toolUses = resp.content.filter((b) => b.type === 'tool_use');
-      if (resp.stop_reason !== 'tool_use' || toolUses.length === 0) break;
+      // Uma tool-call truncada por tamanho vem incompleta (JSON quebrado) e a API rejeita
+      // se a devolvermos — então descartamos SÓ a última quando a resposta foi cortada.
+      let toolUses = resp.content.filter((b) => b.type === 'tool_use');
+      if (resp.stop_reason === 'max_tokens' && toolUses.length > 0) {
+        console.warn(`[admin] resposta cortada por max_tokens; processando ${toolUses.length - 1} tool-calls completas`);
+        toolUses = toolUses.slice(0, -1);
+      }
+      // Continua o loop enquanto houver tool-calls a executar (mesmo se a resposta foi cortada).
+      if (toolUses.length === 0) break;
 
-      messages.push({ role: 'assistant', content: resp.content });
+      // Reconstrói o content do assistant só com as tool-calls que vamos de fato responder,
+      // pra não deixar uma tool_use sem tool_result correspondente.
+      const assistantContent = resp.content.filter((b) => b.type !== 'tool_use' || toolUses.some((t) => t.id === b.id));
+      messages.push({ role: 'assistant', content: assistantContent });
       const toolResults = [];
       for (const tu of toolUses) {
         const out = await runTool(tu.name, tu.input || {}, autorizado);

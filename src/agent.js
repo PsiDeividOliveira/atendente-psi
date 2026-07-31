@@ -122,7 +122,7 @@ export async function handleCustomer(number, userText, pushName = '', attachment
   for (let round = 0; round < 4; round++) {
     const resp = await anthropic.messages.create({
       model: config.claude.model,
-      max_tokens: 1024,
+      max_tokens: 2048,
       system,
       tools: TOOLS,
       messages,
