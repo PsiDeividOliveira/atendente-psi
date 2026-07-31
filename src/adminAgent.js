@@ -14,7 +14,9 @@ import {
 } from './tasks.js';
 import { enviarComoDeivid } from './assinatura.js';
 
-const anthropic = new Anthropic({ apiKey: config.claude.apiKey });
+// maxRetries: reenvio automático em erros temporários (429/500/503/529 "Overloaded").
+// Importante pra lotes grandes (ex.: 12 agendamentos numa tacada), que fazem muitas chamadas.
+const anthropic = new Anthropic({ apiKey: config.claude.apiKey, maxRetries: 5 });
 
 const ADMIN_KEY = 'admin:' + (config.admin.number || 'x'); // chave de histórico separada
 
@@ -561,28 +563,44 @@ export async function handleAdmin(number, userText, attachment = null) {
   }
 
   let finalText = '';
+  let feitasAlgumasAcoes = false; // p/ mensagem de erro mais útil em lotes grandes
 
-  for (let round = 0; round < 5; round++) {
-    const resp = await anthropic.messages.create({
-      model: config.claude.model,
-      max_tokens: 1024,
-      system,
-      tools: TOOLS,
-      messages,
-    });
-    const textOut = resp.content.filter((b) => b.type === 'text').map((b) => b.text).join('\n').trim();
-    if (textOut) finalText = textOut;
+  // Até 12 rodadas: lotes grandes (ex.: 12 agendamentos) podem precisar de várias voltas.
+  try {
+    for (let round = 0; round < 12; round++) {
+      const resp = await anthropic.messages.create({
+        model: config.claude.model,
+        max_tokens: 1024,
+        system,
+        tools: TOOLS,
+        messages,
+      });
+      const textOut = resp.content.filter((b) => b.type === 'text').map((b) => b.text).join('\n').trim();
+      if (textOut) finalText = textOut;
 
-    const toolUses = resp.content.filter((b) => b.type === 'tool_use');
-    if (resp.stop_reason !== 'tool_use' || toolUses.length === 0) break;
+      const toolUses = resp.content.filter((b) => b.type === 'tool_use');
+      if (resp.stop_reason !== 'tool_use' || toolUses.length === 0) break;
 
-    messages.push({ role: 'assistant', content: resp.content });
-    const toolResults = [];
-    for (const tu of toolUses) {
-      const out = await runTool(tu.name, tu.input || {}, autorizado);
-      toolResults.push({ type: 'tool_result', tool_use_id: tu.id, content: out });
+      messages.push({ role: 'assistant', content: resp.content });
+      const toolResults = [];
+      for (const tu of toolUses) {
+        const out = await runTool(tu.name, tu.input || {}, autorizado);
+        feitasAlgumasAcoes = true;
+        toolResults.push({ type: 'tool_result', tool_use_id: tu.id, content: out });
+      }
+      messages.push({ role: 'user', content: toolResults });
     }
-    messages.push({ role: 'user', content: toolResults });
+  } catch (e) {
+    // Erro da API (ex.: "Overloaded" que persistiu após as retentativas).
+    console.error('[admin] erro na chamada ao Claude:', e.message);
+    const sobrecarga = /overload|429|529|rate/i.test(e.message || '');
+    finalText =
+      (finalText ? finalText + '\n\n' : '') +
+      (sobrecarga
+        ? '⚠️ A IA ficou sobrecarregada e não terminei tudo.' +
+          (feitasAlgumasAcoes ? ' Parte pode já ter sido feita — me peça pra "listar a agenda" pra conferir o que entrou.' : '') +
+          ' Tenta de novo em instantes; se for um lote grande, manda em partes menores (uns 5 por vez).'
+        : `⚠️ Deu um erro aqui (${e.message}). Tenta de novo, por favor.`);
   }
 
   if (!finalText) finalText = 'Ok.';

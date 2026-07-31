@@ -8,7 +8,9 @@ import { getHistory, pushMessage } from './memory.js';
 import { abrirPendencia } from './escalation.js';
 import { sendText } from './evolution.js';
 
-const anthropic = new Anthropic({ apiKey: config.claude.apiKey });
+// maxRetries: o SDK reenvia sozinho em erros temporários (429/500/503/529 "Overloaded"),
+// com espera crescente. Evita que uma sobrecarga momentânea da Anthropic derrube a resposta.
+const anthropic = new Anthropic({ apiKey: config.claude.apiKey, maxRetries: 5 });
 
 const TOOLS = [
   {
