@@ -106,6 +106,10 @@ app.post('/webhook', async (req, res) => {
       if (mesmoNumero(evt.number, config.admin.number)) return; // conversa do próprio admin
       try {
         await pausarContato(normBR(evt.number), config.humanTakeoverPauseMin, 'Deivid assumiu');
+        // Guarda o que o Deivid falou na memória da conversa (contexto pra quando o bot voltar).
+        if (evt.text) {
+          await pushMessage(evt.number, { role: 'assistant', content: `(Deivid respondeu pessoalmente) ${evt.text}` }).catch(() => {});
+        }
         console.log(`[handoff] Deivid assumiu ${evt.number} — bot em silêncio por ${config.humanTakeoverPauseMin}min`);
       } catch (e) {
         console.error('[handoff]', e.message);
@@ -187,6 +191,12 @@ app.post('/webhook', async (req, res) => {
     }
     await sendTyping(evt.number, 1200);
     const reply = await handleCustomer(evt.number, evt.text, evt.pushName, attachment);
+    // CORRIDA: o Deivid pode ter assumido a conversa (ou silenciado o bot) DURANTE o
+    // processamento da resposta. Re-checa logo antes de enviar pra NÃO falar por cima dele.
+    if ((await contatoPausado(normBR(evt.number))) || (await botSilenciado())) {
+      console.log(`[handoff] ${evt.number} foi assumido durante o processamento — não enviei, pra não falar por cima.`);
+      return;
+    }
     await enviarComoBot(evt.number, reply);
   } catch (err) {
     console.error('[webhook] erro:', err);
