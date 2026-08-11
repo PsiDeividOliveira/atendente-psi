@@ -318,7 +318,70 @@ const TOOLS = [
       required: ['contato', 'texto'],
     },
   },
+  // ---- VERBO & VISÃO (criação de vídeos) — fala com o worker de vídeos ----
+  {
+    name: 'videos_status',
+    description: 'Status do sistema de vídeos VERBO & VISÃO: horários programados, se está pausado, fila de aprovação e quantos gerou hoje. Leitura.',
+    input_schema: { type: 'object', properties: {} },
+  },
+  {
+    name: 'videos_publicados',
+    description: 'Lista os últimos vídeos publicados no YouTube, com título, link e data. Leitura.',
+    input_schema: { type: 'object', properties: {} },
+  },
+  {
+    name: 'videos_definir_horarios',
+    description: 'Define os horários de geração diária de vídeos. A quantidade de vídeos por dia = quantidade de horários. Confirme com o Deivid antes.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        horarios: { type: 'array', items: { type: 'string' }, description: 'Horários "HH:MM" (Brasília), ex.: ["07:00","19:00"]' },
+      },
+      required: ['horarios'],
+    },
+  },
+  {
+    name: 'videos_pausar',
+    description: 'PAUSA a geração automática de vídeos (a geração manual continua disponível). Confirme antes.',
+    input_schema: { type: 'object', properties: {} },
+  },
+  {
+    name: 'videos_retomar',
+    description: 'RETOMA a geração automática de vídeos nos horários programados.',
+    input_schema: { type: 'object', properties: {} },
+  },
+  {
+    name: 'videos_gerar',
+    description: 'Gera um vídeo extra AGORA (leva ~5-8 min; o vídeo chega no WhatsApp do Deivid para aprovação). Confirme antes.',
+    input_schema: { type: 'object', properties: {} },
+  },
+  {
+    name: 'videos_aprovar',
+    description: 'Aprova o vídeo pendente na fila e PUBLICA no YouTube. Use quando o Deivid mandar aprovar/publicar o vídeo.',
+    input_schema: { type: 'object', properties: {} },
+  },
+  {
+    name: 'videos_rejeitar',
+    description: 'Rejeita e arquiva o vídeo pendente na fila (não publica).',
+    input_schema: { type: 'object', properties: {} },
+  },
 ];
+
+// Chama a API interna do worker de vídeos (mesmo projeto no Easypanel).
+async function videoApi(caminho, metodo = 'GET', corpo = null) {
+  const base = process.env.VIDEO_API_URL || 'http://psi_deivid_oliveira_verbo-visao-worker:8930';
+  const resp = await fetch(base + caminho, {
+    method: metodo,
+    headers: {
+      'Content-Type': 'application/json',
+      'x-token': process.env.VIDEO_API_TOKEN || '',
+    },
+    body: corpo ? JSON.stringify(corpo) : undefined,
+  });
+  const dados = await resp.json().catch(() => ({}));
+  if (!resp.ok) throw new Error(dados.erro || `worker respondeu ${resp.status}`);
+  return dados;
+}
 
 const ESCRITAS = new Set(['alterar_produto', 'definir_config', 'adicionar_faq', 'remover_faq', 'responder_pendencia']);
 
@@ -526,6 +589,44 @@ async function runTool(name, input, autorizado) {
         } catch (e) {
           return `Não consegui enviar: ${e.message}`;
         }
+      }
+      case 'videos_status': {
+        const s = await videoApi('/status');
+        const fila = s.fila.length
+          ? s.fila.map((v) => `• "${v.titulo}" (desde ${v.criado_em})`).join('\n')
+          : 'vazia';
+        return `Geração: ${s.pausado ? 'PAUSADA' : 'ativa'}${s.gerando_agora ? ' (gerando um vídeo agora)' : ''}\n` +
+               `Horários diários: ${s.horarios.join(', ')} (${s.horarios.length} vídeo(s)/dia)\n` +
+               `Gerados hoje: ${s.gerados_hoje}\nFila de aprovação: ${fila}`;
+      }
+      case 'videos_publicados': {
+        const r = await videoApi('/publicados');
+        if (!r.publicados.length) return 'Nenhum vídeo publicado ainda.';
+        return r.publicados
+          .map((v) => `• ${v.publicado_em} — "${v.titulo}"\n  ${v.url}`)
+          .join('\n');
+      }
+      case 'videos_definir_horarios': {
+        const r = await videoApi('/horarios', 'POST', { horarios: input.horarios });
+        return `OK. ${r.horarios.length} vídeo(s) por dia, às ${r.horarios.join(', ')}.`;
+      }
+      case 'videos_pausar':
+        await videoApi('/pausado', 'POST', { pausado: true });
+        return 'OK. Geração automática pausada.';
+      case 'videos_retomar':
+        await videoApi('/pausado', 'POST', { pausado: false });
+        return 'OK. Geração automática retomada.';
+      case 'videos_gerar': {
+        const r = await videoApi('/gerar', 'POST', {});
+        return r.mensagem || 'Geração iniciada.';
+      }
+      case 'videos_aprovar': {
+        const r = await videoApi('/aprovar', 'POST', {});
+        return `Publicado no YouTube: "${r.titulo}" — ${r.url || '(link no WhatsApp)'}`;
+      }
+      case 'videos_rejeitar': {
+        const r = await videoApi('/rejeitar', 'POST', {});
+        return `Rejeitado e arquivado: "${r.titulo}".`;
       }
       default:
         return `Ferramenta desconhecida: ${name}`;
