@@ -365,6 +365,15 @@ const TOOLS = [
     description: 'Rejeita e arquiva o vídeo pendente na fila (não publica).',
     input_schema: { type: 'object', properties: {} },
   },
+  {
+    name: 'videos_modo_aprovacao',
+    description: 'Liga/desliga a APROVAÇÃO AUTOMÁTICA dos vídeos. automatico=true: os vídeos são publicados sozinhos e o Deivid recebe só o link (sem aprovar). automatico=false: cada vídeo é enviado para o Deivid aprovar antes de publicar. Confirme antes de mudar.',
+    input_schema: {
+      type: 'object',
+      properties: { automatico: { type: 'boolean', description: 'true = publicar sem aprovação; false = exigir aprovação' } },
+      required: ['automatico'],
+    },
+  },
 ];
 
 // Chama a API interna do worker de vídeos (mesmo projeto no Easypanel).
@@ -596,8 +605,15 @@ async function runTool(name, input, autorizado) {
           ? s.fila.map((v) => `• "${v.titulo}" (desde ${v.criado_em})`).join('\n')
           : 'vazia';
         return `Geração: ${s.pausado ? 'PAUSADA' : 'ativa'}${s.gerando_agora ? ' (gerando um vídeo agora)' : ''}\n` +
+               `Publicação: ${s.aprovacao_automatica ? 'AUTOMÁTICA (sem aprovação, manda só o link)' : 'MANUAL (envia para o Deivid aprovar)'}\n` +
                `Horários diários: ${s.horarios.join(', ')} (${s.horarios.length} vídeo(s)/dia)\n` +
                `Gerados hoje: ${s.gerados_hoje}\nFila de aprovação: ${fila}`;
+      }
+      case 'videos_modo_aprovacao': {
+        const r = await videoApi('/modo', 'POST', { automatico: !!input.automatico });
+        return r.aprovacao_automatica
+          ? 'OK. Aprovação AUTOMÁTICA ligada: os vídeos serão publicados sozinhos e o Deivid recebe só o link.'
+          : 'OK. Modo MANUAL: cada vídeo será enviado para o Deivid aprovar antes de publicar.';
       }
       case 'videos_publicados': {
         const r = await videoApi('/publicados');

@@ -161,6 +161,7 @@ Você controla e consulta esse sistema com as ferramentas:
 - videos_pausar() / videos_retomar() — liga/desliga a geração automática. Confirme antes de pausar.
 - videos_gerar() — gera um vídeo extra agora (leva ~5-8 min; chega aqui pra aprovação). Confirme antes.
 - videos_aprovar() / videos_rejeitar() — decide sobre o vídeo pendente da fila. Se o Deivid escrever só "aprovar" ou "rejeitar" logo após receber um vídeo, é disso que ele fala.
+- videos_modo_aprovacao(automatico) — MODO de publicação. automatico=true: os vídeos são publicados SOZINHOS e o Deivid recebe só o link (sem precisar aprovar). automatico=false: cada vídeo é enviado para o Deivid aprovar antes. Ex.: "pode postar sem aprovação" → automatico=true; "quero aprovar antes" → automatico=false. Confirme antes de mudar.
 
 # Agenda: COMPROMISSO vs TAREFA (são coisas diferentes!)
 São dois lugares distintos no Google — não confunda:
