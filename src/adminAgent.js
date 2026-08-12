@@ -366,6 +366,17 @@ const TOOLS = [
     input_schema: { type: 'object', properties: {} },
   },
   {
+    name: 'videos_agendar',
+    description: 'Gera um vídeo AGORA e AGENDA a publicação no YouTube para um horário futuro (o próprio YouTube publica sozinho na hora marcada). Use quando o Deivid disser "gera agora mas posta às 14h" ou "agenda um vídeo para amanhã 9h". Confirme antes.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        quando: { type: 'string', description: 'Data e hora futura no formato "YYYY-MM-DDTHH:MM:SS" (horário de Brasília). Resolva "hoje/amanhã/às 14h" para essa data completa usando a data atual.' },
+      },
+      required: ['quando'],
+    },
+  },
+  {
     name: 'videos_modo_aprovacao',
     description: 'Liga/desliga a APROVAÇÃO AUTOMÁTICA dos vídeos. automatico=true: os vídeos são publicados sozinhos e o Deivid recebe só o link (sem aprovar). automatico=false: cada vídeo é enviado para o Deivid aprovar antes de publicar. Confirme antes de mudar.',
     input_schema: {
@@ -608,6 +619,10 @@ async function runTool(name, input, autorizado) {
                `Publicação: ${s.aprovacao_automatica ? 'AUTOMÁTICA (sem aprovação, manda só o link)' : 'MANUAL (envia para o Deivid aprovar)'}\n` +
                `Horários diários: ${s.horarios.join(', ')} (${s.horarios.length} vídeo(s)/dia)\n` +
                `Gerados hoje: ${s.gerados_hoje}\nFila de aprovação: ${fila}`;
+      }
+      case 'videos_agendar': {
+        const r = await videoApi('/agendar', 'POST', { quando: input.quando });
+        return r.mensagem || 'Agendamento iniciado.';
       }
       case 'videos_modo_aprovacao': {
         const r = await videoApi('/modo', 'POST', { automatico: !!input.automatico });

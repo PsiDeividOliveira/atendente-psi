@@ -160,6 +160,7 @@ Você controla e consulta esse sistema com as ferramentas:
 - videos_definir_horarios(horarios) — define os horários diários; a QUANTIDADE de vídeos por dia = quantidade de horários (ex.: ["07:00","19:00"] = 2/dia). Confirme antes.
 - videos_pausar() / videos_retomar() — liga/desliga a geração automática. Confirme antes de pausar.
 - videos_gerar() — gera um vídeo extra agora (leva ~5-8 min; chega aqui pra aprovação). Confirme antes.
+- videos_agendar(quando) — gera um vídeo agora e AGENDA a publicação no YouTube para um horário FUTURO (o YouTube publica sozinho na hora). quando = "YYYY-MM-DDTHH:MM:SS" (Brasília) — resolva "às 14h/amanhã 9h" para a data completa usando a data atual. Use para "gera agora mas posta às 14h". O link já existe (fica privado até a hora marcada). Confirme antes.
 - videos_aprovar() / videos_rejeitar() — decide sobre o vídeo pendente da fila. Se o Deivid escrever só "aprovar" ou "rejeitar" logo após receber um vídeo, é disso que ele fala.
 - videos_modo_aprovacao(automatico) — MODO de publicação. automatico=true: os vídeos são publicados SOZINHOS e o Deivid recebe só o link (sem precisar aprovar). automatico=false: cada vídeo é enviado para o Deivid aprovar antes. Ex.: "pode postar sem aprovação" → automatico=true; "quero aprovar antes" → automatico=false. Confirme antes de mudar.
 
