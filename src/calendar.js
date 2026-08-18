@@ -3,6 +3,7 @@
 
 import { GoogleAuth } from 'google-auth-library';
 import { config } from './config.js';
+import { getOAuthToken } from './oauth.js';
 
 let client = null;
 
@@ -78,7 +79,7 @@ async function calFetch(path, method = 'GET', body) {
 }
 
 // Cria um COMPROMISSO com hora. inicio/fim = 'YYYY-MM-DDTHH:MM:SS' (horário de Brasília).
-export async function criarEvento({ titulo, inicio, fim, descricao, cor, recorrencia, repeticoes, ate }) {
+export async function criarEvento({ titulo, inicio, fim, descricao, cor, recorrencia, repeticoes, ate, meet }) {
   const tz = config.google.timezone;
   const body = {
     summary: titulo,
@@ -90,8 +91,28 @@ export async function criarEvento({ titulo, inicio, fim, descricao, cor, recorre
   if (cid) body.colorId = cid;
   const rec = buildRRULE({ recorrencia, repeticoes, ate });
   if (rec) body.recurrence = rec;
+
+  if (meet) {
+    // Google Meet SÓ é gerado criando EM NOME do Deivid (OAuth) — a conta de
+    // serviço devolve "Invalid conference type value". Por isso, com Meet, usamos o token OAuth.
+    body.conferenceData = {
+      createRequest: { requestId: 'meet-' + Date.now(), conferenceSolutionKey: { type: 'hangoutsMeet' } },
+    };
+    const token = await getOAuthToken();
+    const res = await fetch(
+      `https://www.googleapis.com/calendar/v3/calendars/${calId()}/events?conferenceDataVersion=1`,
+      { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) },
+    );
+    if (!res.ok) {
+      const t = await res.text().catch(() => '');
+      throw new Error(`Calendar(OAuth) ${res.status} ${t.slice(0, 300)}`);
+    }
+    const ev = await res.json();
+    return { id: ev.id, link: ev.htmlLink, meet: ev.hangoutLink || '' };
+  }
+
   const ev = await calFetch(`calendars/${calId()}/events`, 'POST', body);
-  return { id: ev.id, link: ev.htmlLink };
+  return { id: ev.id, link: ev.htmlLink, meet: '' };
 }
 
 // Cria uma TAREFA como evento de dia inteiro. quando = 'YYYY-MM-DD' (ou vazio = hoje).

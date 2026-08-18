@@ -127,6 +127,7 @@ const TOOLS = [
         recorrencia: { type: 'string', description: 'Repetição (opcional): diaria, semanal, quinzenal, mensal, anual. Só pra eventos que se repetem (ex.: consulta toda quinta).' },
         repeticoes: { type: 'number', description: 'Quantas vezes repetir (opcional). Ex.: 8 sessões.' },
         ate: { type: 'string', description: 'Repetir até esta data "YYYY-MM-DD" (opcional, alternativa a repeticoes).' },
+        meet: { type: 'boolean', description: 'true = adiciona link do Google Meet ao evento. Use pra sessões/consultas ONLINE ou quando o Deivid pedir "com Meet".' },
       },
       required: ['titulo', 'inicio', 'fim'],
     },
@@ -455,8 +456,8 @@ async function runTool(name, input, autorizado) {
       }
       case 'agendar_compromisso': {
         try {
-          await criarEvento(input);
-          return `OK. Compromisso "${input.titulo}" agendado para ${input.inicio}.`;
+          const r = await criarEvento(input);
+          return `OK. Compromisso "${input.titulo}" agendado para ${input.inicio}.` + (r.meet ? `\n📹 Link do Meet: ${r.meet}` : '');
         } catch (e) {
           const dica = e.message.includes('não configurada') ? ' (a agenda Google ainda não foi conectada)' : '';
           return `Não consegui agendar: ${e.message}${dica}`;
