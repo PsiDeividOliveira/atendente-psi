@@ -268,7 +268,17 @@ const TOOLS = [
   },
   {
     name: 'retomar_atendimento',
-    description: 'Faz o bot VOLTAR a responder um contato que estava pausado (o Deivid terminou de atender).',
+    description: 'Faz o bot VOLTAR a responder um contato que estava pausado OU bloqueado (o Deivid liberou).',
+    input_schema: {
+      type: 'object',
+      properties: { contato: { type: 'string', description: 'Número do cliente, só dígitos com DDI' } },
+      required: ['contato'],
+    },
+  },
+  {
+    name: 'bloquear_contato',
+    description:
+      'BLOQUEIA um contato PERMANENTEMENTE — o bot nunca mais responde essa pessoa, até o Deivid mandar liberar (retomar_atendimento). Diferente de pausar (que expira). Use quando o Deivid disser "bloqueia pra sempre" / "não responde mais essa pessoa".',
     input_schema: {
       type: 'object',
       properties: { contato: { type: 'string', description: 'Número do cliente, só dígitos com DDI' } },
@@ -277,7 +287,7 @@ const TOOLS = [
   },
   {
     name: 'listar_pausas',
-    description: 'Lista os contatos em silêncio agora (que o Deivid assumiu). Leitura.',
+    description: 'Lista os contatos em silêncio agora (pausados ou bloqueados), com o motivo. Leitura.',
     input_schema: { type: 'object', properties: {} },
   },
   {
@@ -569,13 +579,21 @@ async function runTool(name, input, autorizado) {
         const c = normDig(input.contato);
         if (!c) return 'Preciso do número do contato.';
         await db.retomarContato(c);
-        return `OK. Voltei a responder ${c}.`;
+        return `OK. Voltei a responder ${c} (pausa/bloqueio removido).`;
+      }
+      case 'bloquear_contato': {
+        const c = normDig(input.contato);
+        if (!c) return 'Preciso do número do contato (só dígitos, com DDI, ex.: 5534988887777).';
+        await db.bloquearContato(c, 'bloqueado permanentemente pelo Deivid');
+        return `🚫 OK. ${c} BLOQUEADO permanentemente — não respondo mais essa pessoa até você mandar liberar ("volta a responder ${c}").`;
       }
       case 'listar_pausas': {
         const ps = await db.listarPausas();
-        return ps.length
-          ? 'Em silêncio agora:\n' + ps.map((p) => `• ${p.contato} (${p.motivo || '—'})`).join('\n')
-          : 'Nenhum contato pausado — estou respondendo todo mundo.';
+        if (!ps.length) return 'Nenhum contato pausado ou bloqueado — estou respondendo todo mundo.';
+        return 'Em silêncio agora:\n' + ps.map((p) => {
+          const perm = /bloquead/i.test(p.motivo || '') || (p.ate && new Date(p.ate).getFullYear() > 2100);
+          return `• ${p.contato} ${perm ? '🚫 BLOQUEADO' : '⏸️ pausado'} (${p.motivo || '—'})`;
+        }).join('\n');
       }
       case 'silenciar_bot': {
         if (input.ate) {

@@ -335,6 +335,17 @@ export async function contatoPausado(contato) {
   return rows.length > 0;
 }
 
+// Bloqueio PERMANENTE — o bot nunca mais responde esse contato (até o Deivid desbloquear).
+// Implementado como uma pausa de validade muito longa (100 anos).
+export async function bloquearContato(contato, motivo = 'bloqueado permanentemente pelo Deivid') {
+  await q(
+    `insert into pausas (contato, ate, motivo, criado_em)
+     values ($1, now() + interval '100 years', $2, now())
+     on conflict (contato) do update set ate=excluded.ate, motivo=excluded.motivo, criado_em=now()`,
+    [canonContato(contato), motivo],
+  );
+}
+
 // Migração única: canonicaliza chaves de pausa antigas pra baterem com o novo formato.
 export async function migrarPausas() {
   try {
