@@ -688,7 +688,8 @@ async function runTool(name, input, autorizado) {
 
 export async function handleAdmin(number, userText, attachment = null) {
   const base = await db.loadBase();
-  const system = buildAdminPrompt(base);
+  const pendencias = await db.getOpenPendencias().catch(() => []);
+  const system = buildAdminPrompt(base, pendencias);
 
   const historyText = userText || (attachment
     ? (attachment.kind === 'image' ? '[imagem enviada]' : '[documento PDF enviado]')

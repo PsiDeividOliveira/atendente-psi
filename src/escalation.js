@@ -24,7 +24,8 @@ export async function abrirPendencia({ clienteNumero, clienteNome, pergunta, con
       `🙋 *Dúvida que eu não sei responder* — pendência #${id}\n\n` +
       `De: ${nome}\n` +
       `Pergunta: "${pergunta}"\n\n` +
-      `➡️ *Responda ESTA mensagem (citando/respondendo)* com a resposta certa, que eu repasso pra pessoa e guardo pra próxima.`;
+      `➡️ *Me manda a resposta certa* (pode responder aqui normalmente, não precisa citar) que eu repasso pra pessoa na hora e guardo pra próxima. ` +
+      `Se tiver mais de uma dúvida aberta, comece com "pendência #${id}:" pra eu não confundir.`;
     try {
       const res = await sendText(config.notifyNumber, texto);
       const msgId = res?.key?.id || res?.message?.key?.id;
