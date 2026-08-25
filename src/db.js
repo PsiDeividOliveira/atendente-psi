@@ -96,6 +96,7 @@ create table if not exists pausas (
 export async function initDb() {
   await q(SCHEMA);
   await seedIfEmpty();
+  await migrarPausas();
   console.log('[db] schema pronto');
 }
 
@@ -302,24 +303,50 @@ export async function limparHistorico(contato) {
 }
 
 // ── Pausa de atendimento (handoff: o Deivid assumiu a conversa) ─
+// Normaliza o número pra uma forma canônica que IGNORA o DDI 55 e o 9º dígito do
+// celular. Assim a pausa BATE mesmo se foi salva com/sem 55 ou com/sem o 9 —
+// era por isso que o bot continuava respondendo. Chaves especiais (__GLOBAL__) passam sem mexer.
+export function canonContato(contato) {
+  const s = String(contato || '');
+  let d = s.replace(/\D/g, '');
+  if (!d) return s;                                                    // sem dígitos (ex.: __GLOBAL__)
+  if (d.length >= 12 && d.startsWith('55')) d = d.slice(2);            // remove DDI 55
+  if (d.length === 11 && d[2] === '9') d = d.slice(0, 2) + d.slice(3); // remove 9º dígito do celular
+  return d;
+}
+
 // Enquanto pausado, o bot não responde aquele contato. Renova a cada ação humana.
 export async function pausarContato(contato, minutos, motivo = 'humano assumiu') {
   await q(
     `insert into pausas (contato, ate, motivo, criado_em)
      values ($1, now() + ($2 || ' minutes')::interval, $3, now())
      on conflict (contato) do update set ate=excluded.ate, motivo=excluded.motivo, criado_em=now()`,
-    [contato, String(minutos), motivo],
+    [canonContato(contato), String(minutos), motivo],
   );
 }
 
 export async function retomarContato(contato) {
-  await q('delete from pausas where contato = $1', [contato]);
+  await q('delete from pausas where contato = $1', [canonContato(contato)]);
 }
 
 // true se o contato está pausado agora (ate ainda no futuro).
 export async function contatoPausado(contato) {
-  const { rows } = await q('select 1 from pausas where contato = $1 and ate > now() limit 1', [contato]);
+  const { rows } = await q('select 1 from pausas where contato = $1 and ate > now() limit 1', [canonContato(contato)]);
   return rows.length > 0;
+}
+
+// Migração única: canonicaliza chaves de pausa antigas pra baterem com o novo formato.
+export async function migrarPausas() {
+  try {
+    const { rows } = await q('select contato from pausas');
+    for (const r of rows) {
+      const c = canonContato(r.contato);
+      if (c !== r.contato) {
+        try { await q('update pausas set contato=$1 where contato=$2', [c, r.contato]); }
+        catch { await q('delete from pausas where contato=$1', [r.contato]); } // conflito com canônica existente
+      }
+    }
+  } catch (e) { console.warn('[db] migrarPausas falhou:', e.message); }
 }
 
 export async function listarPausas() {

@@ -4,7 +4,10 @@
 
 import { appendHistorico, getHistorico, limparHistorico } from './db.js';
 
-const MAX_MSGS = 20; // quantas mensagens de contexto o agente enxerga
+// Quantas mensagens de contexto o agente enxerga. Subi de 20 -> 50 pra ele
+// lembrar de assuntos já tratados na conversa (WhatsApp = mensagens curtas,
+// então cabe fácil). Ajustável via env HISTORY_MAX_MSGS.
+const MAX_MSGS = Number(process.env.HISTORY_MAX_MSGS || 50);
 
 // Retorna o histórico recente do contato (ordem cronológica).
 export async function getHistory(contato) {
