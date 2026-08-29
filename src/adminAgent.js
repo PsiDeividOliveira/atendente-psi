@@ -396,6 +396,23 @@ const TOOLS = [
       required: ['automatico'],
     },
   },
+  {
+    name: 'videos_playlists',
+    description: 'Lista as playlists do canal do YouTube (id, nome e quantidade de vídeos). Leitura. Use para descobrir o id da playlist que o Deivid mencionou pelo nome antes de definir como padrão.',
+    input_schema: { type: 'object', properties: {} },
+  },
+  {
+    name: 'videos_definir_playlist',
+    description: 'Define a PLAYLIST padrão do YouTube onde os próximos vídeos serão salvos (fica valendo até o Deivid pedir para mudar). Passe playlist_id (pegue com videos_playlists) e o nome dela. Para criar uma playlist nova, use criar=true com o nome. Para parar de salvar em playlist, passe playlist_id vazio. Confirme antes.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        playlist_id: { type: 'string', description: 'ID da playlist existente (de videos_playlists). Vazio ("") remove a playlist padrão.' },
+        nome: { type: 'string', description: 'Nome da playlist (para exibição); ou o nome da nova playlist quando criar=true.' },
+        criar: { type: 'boolean', description: 'true para criar uma playlist nova com esse nome e já defini-la como padrão.' },
+      },
+    },
+  },
 ];
 
 // Chama a API interna do worker de vídeos (mesmo projeto no Easypanel).
@@ -636,8 +653,25 @@ async function runTool(name, input, autorizado) {
           : 'vazia';
         return `Geração: ${s.pausado ? 'PAUSADA' : 'ativa'}${s.gerando_agora ? ' (gerando um vídeo agora)' : ''}\n` +
                `Publicação: ${s.aprovacao_automatica ? 'AUTOMÁTICA (sem aprovação, manda só o link)' : 'MANUAL (envia para o Deivid aprovar)'}\n` +
+               `Playlist padrão: ${s.playlist_nome || '(nenhuma)'}\n` +
                `Horários diários: ${s.horarios.join(', ')} (${s.horarios.length} vídeo(s)/dia)\n` +
                `Gerados hoje: ${s.gerados_hoje}\nFila de aprovação: ${fila}`;
+      }
+      case 'videos_playlists': {
+        const r = await videoApi('/playlists');
+        if (!r.playlists || !r.playlists.length) return 'Nenhuma playlist no canal ainda.';
+        return r.playlists
+          .map((p) => `• "${p.titulo}" — ${p.qtd} vídeo(s) [id: ${p.id}]`)
+          .join('\n');
+      }
+      case 'videos_definir_playlist': {
+        const r = await videoApi('/playlist', 'POST', {
+          playlist_id: input.playlist_id || '',
+          nome: input.nome || '',
+          criar: !!input.criar,
+        });
+        if (!r.playlist_id) return 'OK. Os vídeos não serão mais salvos em nenhuma playlist.';
+        return `OK. Os próximos vídeos serão salvos na playlist "${r.playlist_nome || r.playlist_id}"${r.criada ? ' (criada agora)' : ''}, e isso fica valendo até você pedir para mudar.`;
       }
       case 'videos_agendar': {
         const r = await videoApi('/agendar', 'POST', { quando: input.quando });
