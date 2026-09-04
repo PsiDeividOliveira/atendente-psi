@@ -11,6 +11,19 @@ import { appendLead } from './db.js';
 
 // Cria a pendência e notifica o Deivid. Retorna o id da pendência.
 export async function abrirPendencia({ clienteNumero, clienteNome, pergunta, contexto }) {
+  // Anti-duplicata: se já existe pendência ABERTA pra esse cliente, reaproveita
+  // (não abre outra nem re-notifica). Era isso que gerava 4 pendências iguais → 4 mensagens.
+  try {
+    const abertas = await db.getOpenPendencias();
+    const jaAberta = abertas.find((p) => p.cliente_numero === clienteNumero);
+    if (jaAberta) {
+      console.log(`[escalation] já há pendência #${jaAberta.id} aberta pra ${clienteNumero} — não abri outra.`);
+      return jaAberta.id;
+    }
+  } catch (e) {
+    console.warn('[escalation] checagem de duplicata falhou:', e.message);
+  }
+
   const id = await db.createPendencia({
     cliente_numero: clienteNumero,
     cliente_nome: clienteNome,
@@ -93,9 +106,12 @@ export async function resolverUnicaAberta(resposta) {
 // Sweeper: pendências velhas viram fallback (avisa cliente + registra lead).
 export async function varrerTimeouts() {
   const vencidas = await db.getPendenciasVencidas(config.escalationTimeoutMin);
+  const jaAvisado = new Set(); // pra não mandar o mesmo fallback várias vezes pro mesmo cliente
   for (const p of vencidas) {
     try {
-      await db.expirePendencia(p.id);
+      await db.expirePendencia(p.id); // expira TODAS as vencidas
+      if (jaAvisado.has(p.cliente_numero)) continue; // mas avisa o cliente só UMA vez
+      jaAvisado.add(p.cliente_numero);
       const msg =
         'Ainda estou confirmando essa informação com o Deivid. ' +
         'Pra não te deixar esperando, ele vai te retornar pessoalmente por aqui, tá? 🙏';
