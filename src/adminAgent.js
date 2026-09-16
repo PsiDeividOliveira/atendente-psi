@@ -620,8 +620,13 @@ async function runTool(name, input, autorizado) {
         } else {
           return 'Preciso saber por quanto tempo: um número de minutos OU uma data/hora de retorno.';
         }
+        // Trava: se o silêncio não ficou ativo, é porque a data/hora informada JÁ PASSOU (erro de data).
         const st = await db.statusSilencio();
-        return `OK. Fiquei inoperante pros clientes. Volto ${fmtData(st?.ate)}. Se quiser antes, é só dizer "pode voltar agora".`;
+        if (!st) {
+          await db.reativarBot(); // limpa a entrada inválida
+          return '⚠️ Não silenciei: a data/hora que calculei já passou (provável erro de data minha). Me diga de novo por quanto tempo ou até quando você quer que eu fique off (a partir de agora).';
+        }
+        return `OK, fiquei inoperante pros clientes AGORA. 🔇 Volto ${fmtData(st.ate)}. Você continua falando comigo normalmente; e se quiser voltar antes, é só dizer "pode voltar agora".`;
       }
       case 'reativar_bot': {
         await db.reativarBot();
