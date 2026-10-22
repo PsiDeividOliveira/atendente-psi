@@ -31,7 +31,10 @@ export async function abrirPendencia({ clienteNumero, clienteNome, pergunta, con
     contexto,
   });
 
-  if (config.notifyNumber) {
+  // Se o Deivid ligou o modo inoperante enquanto esta dúvida era processada,
+  // não dispara a notificação agora (o bot está calado pra todos). A pendência
+  // fica aberta e entra na varredura assim que o bot voltar a operar.
+  if (config.notifyNumber && !(await db.botSilenciado())) {
     const nome = clienteNome ? `${clienteNome} (${clienteNumero})` : clienteNumero;
     const texto =
       `🙋 *Dúvida que eu não sei responder* — pendência #${id}\n\n` +
@@ -105,6 +108,14 @@ export async function resolverUnicaAberta(resposta) {
 
 // Sweeper: pendências velhas viram fallback (avisa cliente + registra lead).
 export async function varrerTimeouts() {
+  // Modo inoperante = o bot não fala com NINGUÉM (nem cliente, nem avisa o Deivid).
+  // Sem esta trava, o sweeper continuava mandando "ele vai te retornar" pros
+  // clientes e os "⏰ pendência #X passou de 30min" pro Deivid DURANTE o silêncio.
+  // Adiamos a varredura: as pendências seguem ABERTAS e são tratadas quando voltar.
+  if (await db.botSilenciado()) {
+    console.log('[escalation] bot inoperante — varredura de timeouts adiada.');
+    return;
+  }
   const vencidas = await db.getPendenciasVencidas(config.escalationTimeoutMin);
   const jaAvisado = new Set(); // pra não mandar o mesmo fallback várias vezes pro mesmo cliente
   for (const p of vencidas) {
